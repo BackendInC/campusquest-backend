@@ -5,6 +5,7 @@ services:
     environment:
       POSTGRES_USER: root
       POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: backedinc
     volumes:
       - ./pgdata:/var/lib/postgresql/data 
     ports:
@@ -15,6 +16,17 @@ services:
     restart: always
     ports:
       - 8080:8080
+
+  fastapi_app:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Your FastAPI Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgres://root:1234@db:5432/backedinc
+    depends_on:
+      - db
     
  
 volumes:
