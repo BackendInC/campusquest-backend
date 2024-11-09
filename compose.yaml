@@ -31,6 +31,8 @@ services:
       DATABASE_URL: postgresql://root:1234@10.5.0.2:5432/backendinc?sslmode=disable
     depends_on:
       - db
+    volumes:
+      - ./:/app  # This mounts the local 'app' directory to the container
     networks:
       backend-network:
         ipv4_address: 10.5.0.4
