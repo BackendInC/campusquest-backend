@@ -32,7 +32,7 @@ services:
     depends_on:
       - db
     volumes:
-      - ./:/app  # This mounts the local 'app' directory to the container
+      - ./:/app
     networks:
       backend-network:
         ipv4_address: 10.5.0.4

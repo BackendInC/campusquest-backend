@@ -7,8 +7,9 @@ RUN apt-get update && apt-get install -y netcat-traditional
 # Set the working directory in the container
 WORKDIR /app
 
-# Install dependencies
-RUN pip install -r requirements.txt
+COPY requirements.txt /app
+
+RUN pip install -r /app/requirements.txt
 
 # Expose port 8000 to the outside world
 EXPOSE 8000
