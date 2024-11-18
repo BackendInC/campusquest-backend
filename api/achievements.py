@@ -1,22 +1,22 @@
-import api
-from FastApi import Depends, HTTPException
-from db import schemas
+from fastapi import Depends, HTTPException, APIRouter
+from db import schemas, get_db
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import db.models as models
-from startlette.status import HTTP_200_OK
+
+router = APIRouter()
 
 
-@api.app.get("/achievements", response_model=list[schemas.AchievementResponse])
-def read_achievements(db: Session = Depends(api.get_db)):
+@router.get("/achievements", response_model=list[schemas.AchievementResponse])
+def read_achievements(db: Session = Depends(get_db)):
     # Get all achievements from the database
     achievements = db.query(models.Achievements).all()
     return achievements
 
 
-@api.app.post("/achievements", response_model=schemas.AchievementResponse)
+@router.post("/achievements", response_model=schemas.AchievementResponse)
 def create_achievement(
-    achievement: schemas.AchievementBase, db: Session = Depends(api.get_db)
+    achievement: schemas.AchievementBase, db: Session = Depends(get_db)
 ):
     # Create a new Achievement instance
     new_achievement = models.Achievements(
@@ -31,10 +31,10 @@ def create_achievement(
     return new_achievement
 
 
-@api.app.get(
+@router.get(
     "/{user_id}/achievements", response_model=list[schemas.UserAchievementResponse]
 )
-def read_user_achievements(user_id: int, db: Session = Depends(api.get_db)):
+def read_user_achievements(user_id: int, db: Session = Depends(get_db)):
     # Get all achievements for a user
     user_achievements = (
         db.query(models.UserAchievements)
@@ -44,9 +44,9 @@ def read_user_achievements(user_id: int, db: Session = Depends(api.get_db)):
     return user_achievements
 
 
-@api.app.put("/achievements", status_code=HTTP_200_OK)
+@router.put("/achievements", status_code=200)
 def create_user_achievement(
-    achievement: schemas.UserAchievementBase, db: Session = Depends(api.get_db)
+    achievement: schemas.UserAchievementBase, db: Session = Depends(get_db)
 ):
     # Check if user exists
     user = db.query(models.User).filter(models.User.id == achievement.user_id).first()

@@ -1,37 +1,31 @@
 from fastapi import FastAPI, Depends, HTTPException
-from sqlalchemy.orm import Session, exc
-import db
+from sqlalchemy.orm import session, exc
+from db import get_db
 import db.models as models
 import db.schemas as schemas
 
-
-# Dependency to get a session per request
-def get_db():
-    session: Session = db.SessionLocal()
-    try:
-        yield session
-    finally:
-        session.close()
-
+# routers for each api prefix
+from api.achievements import router as achievementsrouter
 
 app = FastAPI()
+app.include_router(achievementsrouter)
 
 
 def start_app():
     @app.get("/")
     def read_root():
-        return {"message": "Hello World"}
+        return {"message": "hello world"}
 
-    @app.get("/users/{user_id}", response_model=schemas.UserResponse)
-    def read_user(user_id: int, db: Session = Depends(get_db)):
-        # Get the user by ID
-        user = db.query(models.User).filter(models.User.id == user_id).first()
+    @app.get("/users/{user_id}", response_model=schemas.userresponse)
+    def read_user(user_id: int, db: session = Depends(get_db)):
+        # get the user by id
+        user = db.query(models.user).filter(models.user.id == user_id).first()
         return user
 
-    @app.post("/users", response_model=schemas.UserResponse)
-    def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-        # Create a new User instance
-        new_user = models.User(
+    @app.post("/users", response_model=schemas.userresponse)
+    def create_user(user: schemas.usercreate, db: session = Depends(get_db)):
+        # create a new user instance
+        new_user = models.user(
             username=user.username,
             email=user.email,
             password=user.password,
@@ -40,13 +34,13 @@ def start_app():
         )
 
         try:
-            # Add and commit the user to the database
+            # add and commit the user to the database
             db.add(new_user)
             db.commit()
             db.refresh(new_user)
 
             return new_user
-        except exc.sa_exc.IntegrityError:
+        except exc.sa_exc.integrityerror:
             raise HTTPException(
-                status_code=400, detail="Username or email already exists"
+                status_code=400, detail="username or email already exists"
             )

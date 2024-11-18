@@ -3,7 +3,7 @@
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, date
-from pydantic import BaseModel
+
 
 class UserBase(BaseModel):
     username: str
@@ -53,4 +53,3 @@ class UserAchievementBase(BaseModel):
 
 class UserAchievementResponse(UserAchievementBase):
     id: int
-

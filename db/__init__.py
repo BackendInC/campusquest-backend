@@ -1,5 +1,5 @@
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.ext.declarative import declarative_base
 import os
 
@@ -14,3 +14,12 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
+
+
+# Dependency to get a session per request
+def get_db():
+    session: Session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
