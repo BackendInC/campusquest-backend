@@ -4,7 +4,6 @@ from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, date
 
-
 class UserBase(BaseModel):
     username: str
     email: str
@@ -55,6 +54,28 @@ class UserAchievementBase(BaseModel):
     class Config:
         orm_mode = True
 
-
 class UserAchievementResponse(UserAchievementBase):
     id: int
+
+
+class QuestBase(BaseModel):
+    name: str
+    description: str
+
+    location_long: float
+    location_lat: float
+    points: int
+    start_date: date
+    end_date: date
+    image: bytes
+
+class QuestCreate(QuestBase):
+    class Config:
+        orm_mode = True
+
+
+class QuestDelete(BaseModel):
+    id: int
+
+    class Config:
+        orm_mode = True
