@@ -12,7 +12,7 @@ FORMAT = "%Y-%m-%d %H:%M:%S"
 def generate_jwt(user_id, secret_key=SECRET_KEY):
     payload = {
         "user_id": user_id,
-        "expires": (datetime.utcnow() + timedelta(minutes=1)).strftime(FORMAT),
+        "expires": (datetime.utcnow() + timedelta(days=1)).strftime(FORMAT),
     }
 
     token = jwt.encode(payload, secret_key, algorithm="HS256")
@@ -27,11 +27,9 @@ security = HTTPBearer()
 def decode_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> int:
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=["HS256"])
-        print(payload)
-
         if datetime.strptime(payload["expires"], FORMAT) < datetime.utcnow():
             raise HTTPException(status_code=401, detail="Token has expired!")
-        return payload
+        return payload["user_id"]
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token has expired!")
     except jwt.InvalidTokenError:
