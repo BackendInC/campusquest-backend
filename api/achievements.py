@@ -79,3 +79,7 @@ def create_user_achievement(
     db.refresh(new_user_achievement)
 
     return {"message": "Achievement added successfully"}
+
+
+
+

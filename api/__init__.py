@@ -6,9 +6,12 @@ import db.schemas as schemas
 
 # routers for each api prefix
 from api.achievements import router as achievementsrouter
+from api.quests import router as questsrouter
 
 app = FastAPI()
 app.include_router(achievementsrouter)
+app.include_router(questsrouter)
+
 
 
 def start_app():
