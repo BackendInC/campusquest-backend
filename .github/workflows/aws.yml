@@ -106,9 +106,9 @@ jobs:
           echo "Logged in successful..."
     
           echo "Pulling  image from ECR..."
-          docker compose pull
+          docker-compose pull
           echo "Docker pull completed..."
 
           echo "Running the containers..."
-          docker compose up -d
+          docker-compose up -d
 
