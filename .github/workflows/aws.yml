@@ -33,7 +33,12 @@ on:
 env:
   AWS_REGION: eu-north-1                      # set this to your preferred AWS region, e.g. us-west-1
   ECR_REPOSITORY: campusquest-backend         # set this to your Amazon ECR repository name
+  ECS_SERVICE: MY_ECS_SERVICE                 # set this to your Amazon ECS service name
+  ECS_CLUSTER: MY_ECS_CLUSTER                 # set this to your Amazon ECS cluster name
+  ECS_TASK_DEFINITION: MY_ECS_TASK_DEFINITION # set this to the path to your Amazon ECS task definition
+                                               # file, e.g. .aws/task-definition.json
   CONTAINER_NAME: campusquest-backend         # set this to the name of the container in the
+                                               # containerDefinitions section of your task definition
 
 permissions:
   contents: read
@@ -68,22 +73,46 @@ jobs:
         # Build a docker container and
         # push it to ECR so that it can
         # be deployed to ECS.
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker compose build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-    - name: Fill in the new image ID in the Amazon ECS task definition
-      id: task-def
-      uses: aws-actions/amazon-ecs-render-task-definition@v1
+    - name: Push the new image to EC2 container
+      uses: appleboy/ssh-action@master
       with:
-        task-definition: ${{ env.ECS_TASK_DEFINITION }}
-        container-name: ${{ env.CONTAINER_NAME }}
-        image: ${{ steps.build-image.outputs.image }}
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USER }}
+        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+        envs: |
+          TAG=${{ github.sha }
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION=eu-north-1
+        script: |
+          echo "AWS CLI version: $(aws --version)"
+          echo "Docker version: $(docker --version)"
+    
+          echo "Stop the current running container if exist..."
+          docker stop ${CONTAINER_NAME} || true
+    
+          echo "Remove the previous container..."
+          docker rm ${CONTAINER_NAME} || true
+    
+          echo "AWS credentials set...."
+          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          export AWS_REGION=${AWS_REGION}
+    
+          echo "Logging in to ECR...."
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_REGISTRY_URL }}
+          echo "Logged in successful..."
+    
+          echo "Pulling  image from ECR..."
+          echo "Docker pull command: docker pull \"${{ secrets.AWS_REGISTRY_URL }}/campusquest-backend:${{ env.TAG }}\""
+          echo "Docker pull completed..."
+    
+          echo "Running the container..."
+          docker run -d \
+            --name bb_internal_api \
+          -p 8080:8080 -p 8000:8000 "${{ secrets.AWS_REGISTRY_URL }}/campusquest-backend:${{ env.TAG }}"
 
-    - name: Deploy Amazon ECS task definition
-      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-      with:
-        task-definition: ${{ steps.task-def.outputs.task-definition }}
-        service: ${{ env.ECS_SERVICE }}
-        cluster: ${{ env.ECS_CLUSTER }}
-        wait-for-service-stability: true
