@@ -116,8 +116,8 @@ jobs:
           echo "Logged in successful..."
     
           echo "Pulling  image from ECR..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml/compose pull
+          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml/compose.yaml pull
           echo "Docker pull completed..."
 
           echo "Running the containers..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml up -d
+          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml/compose.yaml up -d
