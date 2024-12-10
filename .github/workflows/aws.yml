@@ -87,7 +87,7 @@ jobs:
           TAG=${{ github.sha }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION=eu-north-1
+          AWS_REGION="eu-north-1"
         script: |
           echo "AWS CLI version: $(aws --version)"
           echo "Docker version: $(docker --version)"
