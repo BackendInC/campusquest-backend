@@ -1,7 +1,7 @@
 # This folder contains the schemes for the responses and requests of the API
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
 
 
@@ -53,3 +53,69 @@ class UserAchievementBase(BaseModel):
 
 class UserAchievementResponse(UserAchievementBase):
     id: int
+
+
+class PostBase(BaseModel):
+    user_id: int
+    image: bytes
+    caption: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class PostCreate(BaseModel):
+    user_id: int
+    image: bytes
+    caption: str
+
+    class Config:
+        orm_mode = True
+
+class PostResponse(PostBase):
+    id: int #autoincrement id
+
+
+class PostLikeBase(BaseModel):
+    user_id: int
+    post_id: int
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class PostLikeCreate(BaseModel):
+    user_id: int
+    post_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class PostLikeResponse(PostLikeBase):
+    id: int #autoincrement id
+
+
+class PostCommentBase(BaseModel):
+    user_id: int
+    post_id: int
+    content: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class PostCommentCreate(BaseModel):
+    user_id: int
+    post_id: int
+    content: str
+
+    class Config:
+        orm_mode = True
+
+
+class PostCommentResponse(PostCommentBase):
+    id: int #autoincrement id
