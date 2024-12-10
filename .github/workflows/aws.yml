@@ -83,8 +83,8 @@ jobs:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        source: ./docker-compose.yml
-        target: /home/${{ secrets.EC2_USER }}/docker-compose.yml
+        source: ./compose.yaml
+        target: /home/${{ secrets.EC2_USER }}/compose.yaml
 
     - name: Push the new image to EC2 container
       uses: appleboy/ssh-action@master
@@ -115,8 +115,8 @@ jobs:
           echo "Logged in successful..."
     
           echo "Pulling  image from ECR..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/docker-compose.yml pull
+          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml pull
           echo "Docker pull completed..."
 
           echo "Running the containers..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/docker-compose.yml up -d
+          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml up -d
