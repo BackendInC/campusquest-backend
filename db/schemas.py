@@ -73,8 +73,9 @@ class PostCreate(BaseModel):
     class Config:
         orm_mode = True
 
+
 class PostResponse(PostBase):
-    id: int #autoincrement id
+    id: int  # autoincrement id
 
 
 class PostLikeBase(BaseModel):
@@ -95,7 +96,7 @@ class PostLikeCreate(BaseModel):
 
 
 class PostLikeResponse(PostLikeBase):
-    id: int #autoincrement id
+    id: int  # autoincrement id
 
 
 class PostCommentBase(BaseModel):
@@ -118,4 +119,5 @@ class PostCommentCreate(BaseModel):
 
 
 class PostCommentResponse(PostCommentBase):
-    id: int #autoincrement id
+    id: int  # autoincrement id
+
