@@ -87,7 +87,6 @@ jobs:
           TAG=${{ github.sha }}
           AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_REGION="eu-north-1"
         script: |
           echo "AWS CLI version: $(aws --version)"
           echo "Docker version: $(docker --version)"
@@ -101,10 +100,9 @@ jobs:
           echo "AWS credentials set...."
           export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
           export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-          export AWS_REGION=${AWS_REGION}
     
           echo "Logging in to ECR...."
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin ${{ secrets.AWS_REGISTRY_URL }}
+          aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_REGISTRY_URL }}
           echo "Logged in successful..."
     
           echo "Pulling  image from ECR..."
