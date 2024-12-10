@@ -108,11 +108,9 @@ jobs:
           echo "Logged in successful..."
     
           echo "Pulling  image from ECR..."
-          echo "Docker pull command: docker pull \"${{ secrets.AWS_REGISTRY_URL }}/campusquest-backend:${{ env.TAG }}\""
+          docker compose pull
           echo "Docker pull completed..."
-    
-          echo "Running the container..."
-          docker run -d \
-            --name bb_internal_api \
-          -p 8080:8080 -p 8000:8000 "${{ secrets.AWS_REGISTRY_URL }}/campusquest-backend:${{ env.TAG }}"
+
+          echo "Running the containers..."
+          docker compose up -d
 
