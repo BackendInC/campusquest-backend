@@ -31,6 +31,11 @@ class UserResponse(UserBase):
     created_at: datetime
 
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
 class AchievementBase(BaseModel):
     description: str
     award_tokens: int
@@ -76,12 +81,25 @@ class PostCreate(BaseModel):
 
 class PostResponse(PostBase):
     id: int  # autoincrement id
+    user_id: int
+    image: str
+    caption: str
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+
+class PostUpdate(BaseModel):
+    caption: str
+
+    class Config:
+        orm_mode = True
 
 
 class PostLikeBase(BaseModel):
     user_id: int
     post_id: int
-    created_at: datetime
 
     class Config:
         orm_mode = True
@@ -97,6 +115,7 @@ class PostLikeCreate(BaseModel):
 
 class PostLikeResponse(PostLikeBase):
     id: int  # autoincrement id
+    message: Optional[str] = None
 
 
 class PostCommentBase(BaseModel):
@@ -110,8 +129,6 @@ class PostCommentBase(BaseModel):
 
 
 class PostCommentCreate(BaseModel):
-    user_id: int
-    post_id: int
     content: str
 
     class Config:

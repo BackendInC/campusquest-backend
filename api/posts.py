@@ -1,7 +1,8 @@
-from fastapi import Depends, HTTPException, APIRouter
+from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form
 from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
+import base64
 
 router = APIRouter()  # create an instance of the APIRouter class
 
@@ -9,14 +10,20 @@ router = APIRouter()  # create an instance of the APIRouter class
 # create a new post
 @router.post("/posts", response_model=schemas.PostResponse)
 def create_post(
-    post: schemas.PostCreate,
+    caption: str = Form(...),
+    image: UploadFile = File(...),
     db: Session = Depends(get_db),
     current_user: int = Depends(auth.decode_jwt),
 ):
+    
+    # read the image as binary data
+    image_data = image.file.read()
+
     # create a new post instance
     new_post = models.Posts(
         user_id=current_user,
-        caption=post.caption,
+        caption=caption,
+        image=image_data,
     )
 
     # add and commit the post to the database
@@ -25,9 +32,16 @@ def create_post(
         db.commit()
         db.refresh(new_post)
 
-        return new_post
-    except:
-        raise HTTPException(status_code=400, detail="Failed to create post: {str(e)}")
+        return {
+            "id": new_post.id,
+            "user_id": new_post.user_id,
+            "caption": new_post.caption,
+            "created_at": new_post.created_at,
+            "image": base64.b64encode(new_post.image).decode("utf-8"),  #encode the image as base64
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
 
 
 # read all posts
@@ -35,6 +49,12 @@ def create_post(
 def read_posts(db: Session = Depends(get_db)):
     # get all posts from the database
     posts = db.query(models.Posts).all()
+
+    # decode the image as base64
+    for post in posts:
+        if post.image:
+            post.image = base64.b64encode(post.image).decode("utf-8")
+
     return posts
 
 
@@ -43,8 +63,15 @@ def read_posts(db: Session = Depends(get_db)):
 def read_post(post_id: int, db: Session = Depends(get_db)):
     # get the post by id
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+
+    # check if post exists
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
+
+    # decode the image as base64
+    if post.image:
+        post.image = base64.b64encode(post.image).decode("utf-8")
+
     return post
 
 
@@ -52,12 +79,14 @@ def read_post(post_id: int, db: Session = Depends(get_db)):
 @router.put("/posts/{post_id}", response_model=schemas.PostResponse)
 def update_post(
     post_id: int,
-    post: schemas.PostCreate,
+    post: schemas.PostUpdate,
     db: Session = Depends(get_db),
     current_user: int = Depends(auth.decode_jwt),
 ):
     # get the post by id
     post_db = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+
+    # check if post exists
     if not post_db:
         raise HTTPException(status_code=404, detail="Post not found")
 
@@ -66,6 +95,10 @@ def update_post(
         raise HTTPException(
             status_code=403, detail="You are not the owner of this post"
         )
+    
+    # decode the image as base64
+    if post_db.image:
+        image_base64 = base64.b64encode(post_db.image).decode("utf-8")
 
     # update the post
     try:
@@ -73,7 +106,13 @@ def update_post(
         db.commit()
         db.refresh(post_db)
 
-        return post_db
+        return {
+            "id": post_db.id,
+            "user_id": post_db.user_id,
+            "caption": post_db.caption,
+            "created_at": post_db.created_at,
+            "image": image_base64,
+        }
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to update post: {str(e)}")
@@ -102,11 +141,12 @@ def delete_post(
         db.delete(post)
         db.commit()
         return {"detail": "Post deleted successfully"}
+    
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to delete post: {str(e)}")
 
 
-# like snd unlike a post
+# like and unlike a post
 @router.post("/posts/{post_id}/like", response_model=schemas.PostLikeResponse)
 def toggle_like(
     post_id: int,
@@ -131,9 +171,15 @@ def toggle_like(
     # unlike the post if the user has liked it
     if like:
         try:
+            response = schemas.PostLikeResponse(
+                id=like.id,
+                user_id=like.user_id, 
+                post_id=like.post_id,
+                message="Post unliked successfully"
+            )
             db.delete(like)
             db.commit()
-            return {"detail": "Post unliked successfully"}
+            return response
         except Exception as e:
             raise HTTPException(
                 status_code=400, detail=f"Failed to unlike post: {str(e)}"
@@ -162,14 +208,6 @@ def read_post_likes(post_id: int, db: Session = Depends(get_db)):
 
     # get all likes for a post
     likes = db.query(models.PostLikes).filter(models.PostLikes.post_id == post_id).all()
-    return likes
-
-
-# read all likes for a user
-@router.get("/users/{user_id}/likes", response_model=list[schemas.PostLikeResponse])
-def read_user_likes(user_id: int, db: Session = Depends(get_db)):
-    # get all likes for a user
-    likes = db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).all()
     return likes
 
 
