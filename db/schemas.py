@@ -79,3 +79,13 @@ class QuestDelete(BaseModel):
 
     class Config:
         orm_mode = True
+
+class UserQuestsBase(BaseModel):
+    user_id: int
+    quest_id: int
+
+    class Config:
+        orm_mode = True
+
+class UserQuestsResponse(UserQuestsBase):
+    id: int
