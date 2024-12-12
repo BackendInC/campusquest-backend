@@ -71,3 +71,43 @@ def update_quest(quest_id: int, quest: schemas.QuestCreate, db: Session = Depend
         db.refresh(existing_quest)
 
         return existing_quest
+
+@router.get("/{user_id}/quests", response_model=list[schemas.UserQuestsResponse]
+)
+def read_user_quests(user_id: int, db: Session = Depends(get_db)):
+    user_quests = (db.query(models.UserQuests)
+                   .filter(models.UserQuests.user_id == user_id)
+                   .all()
+    )
+    return user_quests
+
+@router.put("/quests", status_code=200)
+def create_user_quest(quest: schemas.UserQuestsBase, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == quest.user_id).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user_quest = (
+        db.query(models.UserQuests)
+        .filter(models.UserQuests.user_id == quest.user_id,
+                models.UserQuests.quest_id == quest.quest_id)
+        .first()
+    )
+
+    if user_quest is not None:
+        raise HTTPException(status_code=400, detail="User already has this quest")
+
+    new_user_quest = models.UserQuests(
+        user_id = quest.user_id,
+        quest_id = quest.quest_id,
+        date_completed = datetime.now(timezone.utc),
+    )
+
+    # add and commit the user quest to the database
+    db.add(new_user_quest)
+    db.commit()
+    db.refresh(new_user_quest)
+
+    return  {"message": "Quest added successfully"}
+
