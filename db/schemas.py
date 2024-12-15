@@ -31,6 +31,11 @@ class UserResponse(UserBase):
     created_at: datetime
 
 
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
 class AchievementBase(BaseModel):
     description: str
     award_tokens: int

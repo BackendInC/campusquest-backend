@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import db.models as models
 
+import api.auth as auth
+
 router = APIRouter()
 
 
@@ -14,10 +16,16 @@ def read_achievements(db: Session = Depends(get_db)):
     return achievements
 
 
-@router.post("/achievements", response_model=schemas.AchievementResponse)
+@router.post(
+    "/achievements",
+    response_model=schemas.AchievementResponse,
+)
 def create_achievement(
-    achievement: schemas.AchievementBase, db: Session = Depends(get_db)
+    achievement: schemas.AchievementBase,
+    db: Session = Depends(get_db),
+    user_id: dict = Depends(auth.decode_jwt),
 ):
+    print("USERID", user_id)
     # Create a new Achievement instance
     new_achievement = models.Achievements(
         description=achievement.description, award_tokens=achievement.award_tokens
