@@ -73,3 +73,37 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
 
     return {"jwt_token": new_session.session_token}
 
+
+@router.get("/profile/{user_id}", response_model=schemas.ProfileInfoResponse)
+def get_profile_info(
+    user_id: int, 
+    db: session = Depends(get_db), 
+    current_user: int = Depends(auth.decode_jwt)
+):
+
+    #get the user by id
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    #count the number of posts
+    num_posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).count()
+
+    #count the number of likes
+    num_likes = db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).count()
+
+    #count the number of achievements
+    num_achievements = db.query(models.UserAchievements).filter(models.UserAchievements.user_id == user_id).count()
+
+    #number of completed quests
+    num_quests_completed = user.num_quests_completed
+
+
+    return schemas.ProfileInfoResponse(
+        username=user.username, 
+        num_posts=num_posts, 
+        num_likes=num_likes, 
+        num_achievements=num_achievements
+        num_quests_completed=num_quests_completed
+    )

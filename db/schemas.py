@@ -35,6 +35,16 @@ class UserLogin(BaseModel):
     password: str
 
 
+class ProfileInfoResponse(BaseModel):
+    username: str 
+    num_posts: int
+    num_likes: int
+    num_achievements: int
+    num_quests_completed: int
+
+    class Config:
+        orm_mode = True
+
 class AchievementBase(BaseModel):
     description: str
     award_tokens: int
