@@ -9,6 +9,7 @@ from sqlalchemy import (
     LargeBinary,
     ForeignKey,
     UniqueConstraint,
+    Float,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, timedelta
@@ -22,7 +23,6 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
-    salt = Column(String, nullable=False)
     salt = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
@@ -63,7 +63,6 @@ class Sessions(Base):
 
 class Achievements(Base):
     __tablename__ = "achievements"
-    __tablename__ = "achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     description = Column(String, nullable=False)
@@ -75,7 +74,6 @@ class Achievements(Base):
 
 
 class UserAchievements(Base):
-    __tablename__ = "user_achievements"
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)

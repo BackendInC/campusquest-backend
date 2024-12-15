@@ -72,3 +72,4 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
 
     return {"jwt_token": new_session.session_token}
+
