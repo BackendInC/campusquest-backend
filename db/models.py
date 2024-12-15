@@ -110,23 +110,6 @@ class Quests(Base):
                 f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
                 f"date_due={self.date_due}, user_id={self.user_id})>")
 
-class UserQuests(Base):
-    __tablename__ = 'user_quests'
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer,ForeignKey('users.id'), nullable=False)
-    quest_id = Column(Integer,ForeignKey('quests.id'), nullable=False)
-    date_completed = Column(DateTime, default=datetime.now(timezone.utc))
-
-    # Relationships
-    user = relationship("User", back_populates="quests")
-    quest = relationship("Quests", back_populates="users")
-
-
-    def __repr__(self):
-        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-                f"date_completed={self.date_completed})>")
-
 class Posts(Base):
     __tablename__ = "posts"
 
