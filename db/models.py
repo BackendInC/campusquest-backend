@@ -15,12 +15,16 @@ from datetime import datetime, timezone, timedelta
 from db import Base
 
 
+
 class User(Base):
+    __tablename__ = "users"
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
+    salt = Column(String, nullable=False)
     salt = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
@@ -58,6 +62,7 @@ class Sessions(Base):
 
 class Achievements(Base):
     __tablename__ = "achievements"
+    __tablename__ = "achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     description = Column(String, nullable=False)
@@ -65,15 +70,18 @@ class Achievements(Base):
 
     def __repr__(self):
         return f"<Achievements(id={self.id}, description={self.description}, award_tokens={self.award_tokens})>"
+        return f"<Achievements(id={self.id}, description={self.description}, award_tokens={self.award_tokens})>"
 
 
 class UserAchievements(Base):
+    __tablename__ = "user_achievements"
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, nullable=False)
     achievement_id = Column(Integer, nullable=False)
     date_achieved = Column(DateTime, default=datetime.now(timezone.utc))
+
 
     def __repr__(self):
         return (
