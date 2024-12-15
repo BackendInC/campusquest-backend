@@ -41,6 +41,8 @@ class ProfileInfoResponse(BaseModel):
     num_likes: int
     num_achievements: int
     num_quests_completed: int
+    num_friends: int
+    post_ids: List[int]
 
     class Config:
         orm_mode = True

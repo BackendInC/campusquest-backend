@@ -99,11 +99,19 @@ def get_profile_info(
     #number of completed quests
     num_quests_completed = user.num_quests_completed
 
+    #get number of friends
+    num_friends = db.query(models.Friends).filter((models.Friends.user_id == user_id) | (models.Friends.friend_id == user_id)).count()
+
+    #get all post ids
+    post_ids = [post.id for post in db.query(models.Posts).filter(models.Posts.user_id == user_id).all()]
+
 
     return schemas.ProfileInfoResponse(
         username=user.username, 
         num_posts=num_posts, 
         num_likes=num_likes, 
-        num_achievements=num_achievements
-        num_quests_completed=num_quests_completed
+        num_achievements=num_achievements,
+        num_quests_completed=num_quests_completed,
+        num_friends=num_friends,
+        post_ids=post_ids
     )
