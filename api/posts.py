@@ -15,7 +15,6 @@ def create_post(
     db: Session = Depends(get_db),
     current_user: int = Depends(auth.decode_jwt),
 ):
-    
     # read the image as binary data
     image_data = image.file.read()
 
@@ -26,22 +25,7 @@ def create_post(
         image=image_data,
     )
 
-    # add and commit the post to the database
-    try:
-        db.add(new_post)
-        db.commit()
-        db.refresh(new_post)
-
-        return {
-            "id": new_post.id,
-            "user_id": new_post.user_id,
-            "caption": new_post.caption,
-            "created_at": new_post.created_at,
-            "image": base64.b64encode(new_post.image).decode("utf-8"),  #encode the image as base64
-        }
-    
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
+    return models.Posts.create(new_post, db)
 
 
 # read all posts
@@ -95,7 +79,7 @@ def update_post(
         raise HTTPException(
             status_code=403, detail="You are not the owner of this post"
         )
-    
+
     # decode the image as base64
     if post_db.image:
         image_base64 = base64.b64encode(post_db.image).decode("utf-8")
@@ -141,7 +125,7 @@ def delete_post(
         db.delete(post)
         db.commit()
         return {"detail": "Post deleted successfully"}
-    
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to delete post: {str(e)}")
 
@@ -173,9 +157,9 @@ def toggle_like(
         try:
             response = schemas.PostLikeResponse(
                 id=like.id,
-                user_id=like.user_id, 
+                user_id=like.user_id,
                 post_id=like.post_id,
-                message="Post unliked successfully"
+                message="Post unliked successfully",
             )
             db.delete(like)
             db.commit()
@@ -401,4 +385,3 @@ def delete_comment(
         raise HTTPException(
             status_code=400, detail=f"Failed to delete comment: {str(e)}"
         )
-
