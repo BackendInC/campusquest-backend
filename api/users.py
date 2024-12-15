@@ -34,6 +34,13 @@ def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
         db.commit()
         db.refresh(new_user)
 
+        verificationInstance = models.EmailVerificationCode(user_id=new_user.id)
+
+        models.EmailVerificationCode.create(verificationInstance, db)
+        models.EmailVerificationCode.send_email(
+            verificationInstance.code, new_user.email
+        )
+
         return new_user
 
     except exc.sa_exc.IntegrityError:

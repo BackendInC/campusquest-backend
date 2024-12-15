@@ -1,6 +1,8 @@
 # This file includes the SQLAlchemy models for the database tables.
 
+from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, status
 from sqlalchemy import (
+    Boolean,
     Column,
     Integer,
     String,
@@ -9,15 +11,20 @@ from sqlalchemy import (
     LargeBinary,
     ForeignKey,
     UniqueConstraint,
+    Float,
 )
-from sqlalchemy.orm import relationship
-from datetime import datetime, timezone, timedelta
-from db import Base
 
+from sqlalchemy.orm import Session, relationship
+from datetime import datetime, timezone, timedelta
+
+from starlette.status import HTTP_200_OK
+from db import Base
+import base64
+import os
 
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, nullable=False, unique=True)
@@ -26,7 +33,9 @@ class User(Base):
     salt = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
-    profile_picture = Column(LargeBinary, nullable=True)  # Blob field for profile picture
+    profile_picture = Column(
+        LargeBinary, nullable=True
+    )  # Blob field for profile picture
     date_of_birth = Column(Date, nullable=True)
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
@@ -38,12 +47,15 @@ class User(Base):
     # relationships
     quests = relationship("UserQuests", back_populates="user")
 
+    is_email_verified = Column(Boolean, nullable=False, default=False)
+
     def __repr__(self):
         return (
             f"<User(id={self.id}, username={self.username}, email={self.email}, "
             f"created_at={self.created_at}, num_quests_completed={self.num_quests_completed}, "
             f"tokens={self.tokens})>"
         )
+
 
 class Sessions(Base):
     __tablename__ = "sessions"
@@ -60,6 +72,7 @@ class Sessions(Base):
             f"<Sessions(id={self.id}, user_id={self.user_id}, session_token={self.session_token}, "
             f"created_at={self.created_at}, expires_at={self.expires_at})>"
         )
+
 
 class Achievements(Base):
     __tablename__ = "achievements"
@@ -83,14 +96,15 @@ class UserAchievements(Base):
     achievement_id = Column(Integer, nullable=False)
     date_achieved = Column(DateTime, default=datetime.now(timezone.utc))
 
-
     def __repr__(self):
-        return (f"<UserAchievements(id={self.id}, user_id={self.user_id}, achievement_id={self.achievement_id}, "
-            f"date_achieved={self.date_achieved})>")
+        return (
+            f"<UserAchievements(id={self.id}, user_id={self.user_id}, achievement_id={self.achievement_id}, "
+            f"date_achieved={self.date_achieved})>"
+        )
 
 
 class Quests(Base):
-    __tablename__ = 'quests'
+    __tablename__ = "quests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
@@ -98,8 +112,8 @@ class Quests(Base):
 
     location_long = Column(Float, nullable=True)
     location_lat = Column(Float, nullable=True)
-    image = Column(LargeBinary, nullable=True) #put base64 encoded image here
-    points = Column(Integer, nullable=False) # Points awarded for completing the quest
+    image = Column(LargeBinary, nullable=True)  # put base64 encoded image here
+    points = Column(Integer, nullable=False)  # Points awarded for completing the quest
     start_date = Column(Date, nullable=False, default=datetime.now(timezone.utc))
     end_date = Column(DateTime, nullable=True)
     date_posted = Column(DateTime, default=datetime.now(timezone.utc))
@@ -108,26 +122,31 @@ class Quests(Base):
     users = relationship("UserQuests", back_populates="quest")
 
     def __repr__(self):
-        return (f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
-                f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
-                f"date_due={self.date_due}, user_id={self.user_id})>")
+        return (
+            f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
+            f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
+            f"date_due={self.date_due}, user_id={self.user_id})>"
+        )
+
 
 class UserQuests(Base):
-    __tablename__ = 'user_quests'
+    __tablename__ = "user_quests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer,ForeignKey('users.id'), nullable=False)
-    quest_id = Column(Integer,ForeignKey('quests.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
     date_completed = Column(DateTime, default=datetime.now(timezone.utc))
 
     # Relationships
     user = relationship("User", back_populates="quests")
     quest = relationship("Quests", back_populates="users")
 
-
     def __repr__(self):
-        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-                f"date_completed={self.date_completed})>")
+        return (
+            f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
+            f"date_completed={self.date_completed})>"
+        )
+
 
 class Posts(Base):
     __tablename__ = "posts"
@@ -151,6 +170,28 @@ class Posts(Base):
             f"<Posts(id={self.id}, caption={self.caption}, user_id={self.user_id}, "
             f"created_at={self.created_at})>"
         )
+
+    @staticmethod
+    def create(new_post, db):
+        try:
+            db.add(new_post)
+            db.commit()
+            db.refresh(new_post)
+
+            return {
+                "id": new_post.id,
+                "user_id": new_post.user_id,
+                "caption": new_post.caption,
+                "created_at": new_post.created_at,
+                "image": base64.b64encode(new_post.image).decode(
+                    "utf-8"
+                ),  # encode the image as base64
+            }
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to create post: {str(e)}"
+            )
 
 
 class PostLikes(Base):
@@ -190,3 +231,112 @@ class PostComments(Base):
             f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
             f"content={self.content}, created_at={self.created_at})>"
         )
+
+
+from db import get_db
+
+from random import randint
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
+
+class EmailVerificationCode(Base):
+    __tablename__ = "verfication_codes"
+    code = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    valid_until = Column(
+        DateTime, default=datetime.now(timezone.utc) + timedelta(minutes=15)
+    )
+
+    @staticmethod
+    def create(verificationInstance, db: Session) -> int:
+        verificationInstance.code = randint(100000, 1000000)
+        try:
+            # check if previous code for this user exists that is still valid
+            old_code = (
+                db.query(EmailVerificationCode)
+                .filter(EmailVerificationCode.user_id == verificationInstance.user_id)
+                .first()
+            )
+
+            # if exists and valid return the same code
+            if old_code is not None and old_code.valid_until > datetime.now(
+                timezone.utc
+            ):
+                raise HTTPException(500, "A valid verification code exists.")
+
+            # if exists and invalid then destroy the old one and save the new verificationInstance
+            if old_code is not None and old_code.valid_until < datetime.now(
+                timezone.utc
+            ):
+                db.delete(old_code)
+                db.commit()
+
+            # if doesnt exist then save and return the new verificationInstance
+            db.add(verificationInstance)
+            db.commit()
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=e)
+
+    @staticmethod
+    def verify(code: int, user_id: int, db: Session):
+        try:
+            old_code = (
+                db.query(EmailVerificationCode)
+                .filter(EmailVerificationCode.user_id == verificationInstance.user_id)
+                .first()
+            )
+            if old_code:
+                if old_code.code == code:
+                    user = db.query(User).filter(User.id == user_id).first()
+                    user.is_email_verified = True
+                    db.commit()
+                    return HTTP_200_OK
+                else:
+                    raise HTTPException(status=500, detail="Wrong verication code.")
+            else:
+                raise HTTPException(
+                    status=500, detail="There is no verification code for this user."
+                )
+
+        except Exception as e:
+            pass
+
+    @staticmethod
+    def send_email(code: int, email: str):
+        # me == my email address
+        # you == recipient's email address
+        fromaddr = "campus.quest.itu@gmail.com"
+        toaddrs = email
+
+        # Create message container - the correct MIME type is multipart/alternative.
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = "Campus Quest Verification Code"
+        msg["From"] = fromaddr
+        msg["To"] = toaddrs
+
+        # Create the body of the message (a plain-text and an HTML version).
+        html = f"""\
+        <html>
+          <head></head>
+          <body>
+            <h1>Your verification code is: {code}</h1>
+          </body>
+        </html>
+        """
+
+        # Record the MIME types of both parts - text/plain and text/html.
+        part2 = MIMEText(html, "html")
+
+        # Attach parts into message container.
+        # According to RFC 2046, the last part of a multipart message, in this case
+        # the HTML message, is best and preferred.
+        msg.attach(part2)
+
+        server = smtplib.SMTP("smtp.gmail.com:587")
+        server.starttls()
+        server.login(fromaddr, os.getenv("CAMPUS_QUEST"))
+        server.sendmail(fromaddr, toaddrs, msg.as_string())
+        server.quit()
