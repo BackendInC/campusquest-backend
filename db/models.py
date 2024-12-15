@@ -10,10 +10,13 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Float,
+    or_,
+    and_,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, timedelta
 from db import Base
+from fastapi import HTTPException
 
 
 
@@ -206,3 +209,89 @@ class Friends(Base):
 
     def __repr__(self):
         return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
+    
+    @staticmethod
+    def are_friends(user_id, friend_id, db) -> bool:
+        # Check if the users are already friends
+        return db.query(Friends).filter(
+            or_(
+                and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
+                and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
+            )
+        ).first() is not None
+    
+    @staticmethod
+    def create_friend(user_id, friend_id, db) -> "Friends":
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if friend_user is None:
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #prevent adding yourself as a friend
+        if user_id == friend_id:
+            raise HTTPException(status_code=400, detail="Cannot add yourself as a friend")
+        
+        #check if the user is already friends with the friend
+        if Friends.are_friends(user_id, friend_id, db):
+            raise HTTPException(status_code=400, detail="Already friends with this user")
+        
+        #create a new friend instance
+        new_friend = Friends(
+            user_id=user_id,
+            friend_id=friend_id
+        )
+
+        #add and commit the friend to the database
+        try:
+            db.add(new_friend)
+            db.commit()
+            db.refresh(new_friend)
+
+            return new_friend
+        
+        except HTTPException as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create friend {e}")
+    
+    @staticmethod
+    def remove_friend(user_id, friend_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if not (friend_user or user):
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #prevent removing yourself as a friend
+        if user_id == friend_id:
+            raise HTTPException(status_code=400, detail="Cannot remove yourself as a friend")
+        
+        #check if the user is already friends with the friend
+        friend = Friends.are_friends(user_id, friend_id, db)
+        if friend is None:
+            raise HTTPException(status_code=400, detail="Not friends with this user")
+        
+        #remove the friend
+        try:
+            db.delete(friend)
+            db.commit()
+        
+        except HTTPException as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to remove friend {e}")
+        
+
+    @staticmethod
+    def get_friends(user_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        #get all friends of the user
+        friends = db.query(Friends).filter(Friends.user_id == user_id).all()
+        return friends
