@@ -13,3 +13,4 @@ def verify(
     db: Session = Depends(get_db),
 ):
     models.EmailVerificationCode.verify(code_user_id.code, code_user_id.user_id, db)
+    return {"message": f"{code_user_id}"}

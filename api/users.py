@@ -1,3 +1,4 @@
+from email.policy import HTTP
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import session, exc
 
@@ -50,7 +51,7 @@ def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
 @router.post("/user/login", status_code=200)
 def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     # get the user by username
-    user = (
+    user: models.User = (
         db.query(models.User)
         .filter(models.User.username == userRequest.username)
         .first()
@@ -59,6 +60,8 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    if not user.is_email_verified:
+        raise HTTPException(status_code=401, detail="User is not verified")
     # check if the password is correct
     hashed_password = utils.hash_password(userRequest.password, user.salt)
     if hashed_password != user.password:
@@ -79,4 +82,3 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
 
     return {"jwt_token": new_session.session_token}
-

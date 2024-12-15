@@ -235,7 +235,6 @@ class PostComments(Base):
         )
 
 
-
 class EmailVerificationCode(Base):
     __tablename__ = "verfication_codes"
     code = Column(Integer, nullable=False)
@@ -280,7 +279,7 @@ class EmailVerificationCode(Base):
         try:
             old_code = (
                 db.query(EmailVerificationCode)
-                .filter(EmailVerificationCode.user_id == verificationInstance.user_id)
+                .filter(EmailVerificationCode.user_id == user_id)
                 .first()
             )
             if old_code:
@@ -288,16 +287,20 @@ class EmailVerificationCode(Base):
                     user = db.query(User).filter(User.id == user_id).first()
                     user.is_email_verified = True
                     db.commit()
-                    return HTTP_200_OK
+                    db.refresh(user)
+                    return {"messsage": f"{code} {user} "}
                 else:
-                    raise HTTPException(status=500, detail="Wrong verication code.")
+                    raise HTTPException(
+                        status_code=500, detail="Wrong verication code."
+                    )
             else:
                 raise HTTPException(
-                    status=500, detail="There is no verification code for this user."
+                    status_code=500,
+                    detail="There is no verification code for this user.",
                 )
 
         except Exception as e:
-            pass
+            raise HTTPException(status_code=500, detail=f"{e}")
 
     @staticmethod
     def send_email(code: int, email: str):
@@ -332,6 +335,6 @@ class EmailVerificationCode(Base):
 
         server = smtplib.SMTP("smtp.gmail.com:587")
         server.starttls()
-        server.login(fromaddr, os.getenv("CAMPUS_QUEST"))
+        server.login(fromaddr, "ksgk jaid xekg sdft")
         server.sendmail(fromaddr, toaddrs, msg.as_string())
         server.quit()
