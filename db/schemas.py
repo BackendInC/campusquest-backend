@@ -177,3 +177,23 @@ class UserQuestsBase(BaseModel):
 
 class UserQuestsResponse(UserQuestsBase):
     id: int
+
+class FriendshipBase(BaseModel):
+    user_id: int
+    friend_id: int
+
+    class Config:
+        orm_mode = True
+
+class FriendshipCreate(FriendshipBase):
+    id: int # autoincrement id
+
+    class Config:
+        orm_mode = True
+
+class FriendshipResponse(FriendshipBase):
+    id: int  # autoincrement id
+
+    class Config:
+        orm_mode = True
+
