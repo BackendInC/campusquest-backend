@@ -188,3 +188,21 @@ class UserQuests(Base):
     def __repr__(self):
         return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
                 f"date_completed={self.date_completed})>")
+
+class Friends(Base):
+    __tablename__ = "friends"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    #relationships
+    user = relationship("User", foreign_keys=[user_id])
+    friend = relationship("User", foreign_keys=[friend_id])
+
+    # Ensure that a user cannot be friends with the same user twice
+    __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
+
+    def __repr__(self):
+        return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
