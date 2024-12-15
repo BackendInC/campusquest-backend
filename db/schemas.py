@@ -145,3 +145,34 @@ class EmailVerificationInput(BaseModel):
 
     class Config:
         orm_mode = True
+class QuestBase(BaseModel):
+    name: str
+    description: str
+
+    location_long: float
+    location_lat: float
+    points: int
+    start_date: date
+    end_date: date
+    image: bytes
+
+class QuestCreate(QuestBase):
+    class Config:
+        orm_mode = True
+
+
+class QuestDelete(BaseModel):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+class UserQuestsBase(BaseModel):
+    user_id: int
+    quest_id: int
+
+    class Config:
+        orm_mode = True
+
+class UserQuestsResponse(UserQuestsBase):
+    id: int

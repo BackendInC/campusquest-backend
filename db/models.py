@@ -1,4 +1,9 @@
 # This file includes the SQLAlchemy models for the database tables.
+from random import randint
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 
 from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, status
 from sqlalchemy import (
@@ -29,7 +34,6 @@ class User(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     username = Column(String, nullable=False, unique=True)
     password = Column(String, nullable=False)
-    salt = Column(String, nullable=False)
     salt = Column(String, nullable=False)
     email = Column(String, nullable=False, unique=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
@@ -76,7 +80,6 @@ class Sessions(Base):
 
 class Achievements(Base):
     __tablename__ = "achievements"
-    __tablename__ = "achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     description = Column(String, nullable=False)
@@ -88,7 +91,6 @@ class Achievements(Base):
 
 
 class UserAchievements(Base):
-    __tablename__ = "user_achievements"
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -232,13 +234,6 @@ class PostComments(Base):
             f"content={self.content}, created_at={self.created_at})>"
         )
 
-
-from db import get_db
-
-from random import randint
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 
 
 class EmailVerificationCode(Base):
