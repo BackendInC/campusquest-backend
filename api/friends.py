@@ -36,3 +36,22 @@ def list_friends(
     #list all friends
     return models.Friends.list_friends(user_id, db)
 
+#check if a user is a friend
+@router.get("/friends/{friend_id}", response_model=schemas.FriendResponse)
+def check_friend(
+    friend_id: int, 
+    db: session = Depends(get_db), 
+    user_id: int = Depends(auth.decode_jwt)
+):
+    #check if a user is a friend
+    return models.Friends.check_friend(user_id, friend_id, db)
+
+#get mutual friends
+@router.get("/friends/mutual/{friend_id}", response_model=list[schemas.FriendResponse])
+def get_mutual_friends(
+    friend_id: int, 
+    db: session = Depends(get_db), 
+    user_id: int = Depends(auth.decode_jwt)
+):
+    #get mutual friends
+    return models.Friends.get_mutual_friends(user_id, friend_id, db)

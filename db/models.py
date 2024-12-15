@@ -295,3 +295,22 @@ class Friends(Base):
         #get all friends of the user
         friends = db.query(Friends).filter(Friends.user_id == user_id).all()
         return friends
+    
+    @staticmethod
+    def get_mutual_friends(user_id, friend_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if not (friend_user or user):
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #get all friends of the user
+        user_friends = db.query(Friends).filter(Friends.user_id == user_id).all()
+        friend_friends = db.query(Friends).filter(Friends.user_id == friend_id).all()
+
+        #get mutual friends
+        mutual_friends = [friend for friend in user_friends if friend in friend_friends]
+        return mutual_friends
