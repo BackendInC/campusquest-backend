@@ -34,3 +34,10 @@ def decode_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
         raise HTTPException(status_code=401, detail="Token has expired!")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token!")
+
+
+def check_admin(credentials: HTTPAuthorizationCredentials = Security(security)):
+    user_id = decode_jwt(credentials)
+    if user_id != 1:
+        raise HTTPException(status_code=403, detail="You are not an admin!")
+    return user_id

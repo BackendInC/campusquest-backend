@@ -7,7 +7,7 @@ from io import BytesIO
 from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 
-router = APIRouter()  # create an instance of the APIRouter class
+router = APIRouter(tags=["posts"])  # create an instance of the APIRouter class
 
 # Example max file size: 5 MB (Adjust as needed)
 MAX_FILE_SIZE = 5 * 1024 * 1024

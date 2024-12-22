@@ -14,7 +14,7 @@ import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=schemas.UserResponse)
