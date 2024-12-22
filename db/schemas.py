@@ -1,7 +1,7 @@
 # This folder contains the schemes for the responses and requests of the API
 
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date
 
 
@@ -145,6 +145,7 @@ class EmailVerificationInput(BaseModel):
 
     class Config:
         orm_mode = True
+
 class QuestBase(BaseModel):
     name: str
     description: str
@@ -155,6 +156,7 @@ class QuestBase(BaseModel):
     start_date: date
     end_date: date
     image: bytes
+
 
 class QuestCreate(QuestBase):
     class Config:
@@ -167,12 +169,14 @@ class QuestDelete(BaseModel):
     class Config:
         orm_mode = True
 
+
 class UserQuestsBase(BaseModel):
     user_id: int
     quest_id: int
 
     class Config:
         orm_mode = True
+
 
 class UserQuestsResponse(UserQuestsBase):
     id: int

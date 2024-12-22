@@ -25,7 +25,6 @@ from db import Base
 import base64
 import os
 
-
 class User(Base):
     __tablename__ = "users"
 
@@ -96,7 +95,6 @@ class UserAchievements(Base):
     achievement_id = Column(Integer, nullable=False)
     date_achieved = Column(DateTime, default=datetime.now(timezone.utc))
 
-
     def __repr__(self):
         return (
             f"<UserAchievements(id={self.id}, user_id={self.user_id}, achievement_id={self.achievement_id}, "
@@ -123,9 +121,31 @@ class Quests(Base):
     users = relationship("UserQuests", back_populates="quest")
 
     def __repr__(self):
-        return (f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
-                f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
-                f"date_due={self.date_due}, user_id={self.user_id})>")
+        return (
+            f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
+            f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
+            f"date_due={self.date_due}, user_id={self.user_id})>"
+        )
+
+
+class UserQuests(Base):
+    __tablename__ = "user_quests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
+    date_completed = Column(DateTime, default=datetime.now(timezone.utc))
+
+    # Relationships
+    user = relationship("User", back_populates="quests")
+    quest = relationship("Quests", back_populates="users")
+
+    def __repr__(self):
+        return (
+            f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
+            f"date_completed={self.date_completed})>"
+        )
+
 
 class Posts(Base):
     __tablename__ = "posts"

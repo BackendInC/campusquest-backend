@@ -1,6 +1,8 @@
 from email.policy import HTTP
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from sqlalchemy.orm import session, exc
+from io import BytesIO
+from PIL import Image
 
 from db import get_db
 from db import schemas
@@ -9,6 +11,7 @@ from db import models
 import api.utils as utils
 import api.auth as auth
 
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
 router = APIRouter()
 
@@ -82,3 +85,70 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
 
     return {"jwt_token": new_session.session_token}
+
+
+@router.post("/user/upload/profile_picture", status_code=200)
+async def upload_profile_picture(
+    profile_picture: UploadFile = File(...),
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    # Check for file type
+    if profile_picture.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    contents = await profile_picture.read()
+
+    # Check for file size
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File size too large")
+
+    image = Image.open(BytesIO(contents))
+
+    # Convert and encode as JPEG for consistency
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=85)  # Adjust quality if needed
+    buffer.seek(0)
+
+    # Store the binary data in the database
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.profile_picture = buffer.getvalue()
+
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload profile picture: {e}"
+        )
+
+    return {"message": "Profile picture uploaded successfully"}
+
+
+@router.get("/user/{username}/profile_picture", status_code=200)
+async def get_profile_picture(username: str, db: session = Depends(get_db)):
+    user: models.User = (
+        db.query(models.User).filter(models.User.username == username).first()
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.profile_picture is None:
+        raise HTTPException(status_code=404, detail="Profile picture not found")
+
+    # Decode the binary data to an image
+    try:
+        image = Image.open(BytesIO(user.profile_picture))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to process image")
+
+    # Encode the image as JPEG
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    buffer.seek(0)
+
+    # Return the JPEG image
+    return Response(content=buffer.getvalue(), media_type="image/jpeg")
