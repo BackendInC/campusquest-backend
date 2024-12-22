@@ -40,7 +40,7 @@ def create_achievement(
 
 
 @router.get(
-    "/{user_id}/achievements", response_model=list[schemas.UserAchievementResponse]
+    "/achievements/user/{user_id}", response_model=list[schemas.UserAchievementResponse]
 )
 def read_user_achievements(user_id: int, db: Session = Depends(get_db)):
     # Get all achievements for a user
