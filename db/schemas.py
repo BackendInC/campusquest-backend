@@ -167,3 +167,9 @@ class UserQuestsBase(BaseModel):
 
 class UserQuestsResponse(UserQuestsBase):
     id: int
+
+class QuestVerification(BaseModel):
+    user_quest_id: int
+
+    class Config:
+        orm_mode = True

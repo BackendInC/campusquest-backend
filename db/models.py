@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Float,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, timedelta
@@ -178,13 +179,26 @@ class UserQuests(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer,ForeignKey('users.id'), nullable=False)
     quest_id = Column(Integer,ForeignKey('quests.id'), nullable=False)
+    is_done = Column(Boolean, default=False, nullable=False)
     date_completed = Column(DateTime, default=datetime.now(timezone.utc))
+    is_verified = Column(Boolean, default=False, nullable=False)
 
     # Relationships
     user = relationship("User", back_populates="quests")
     quest = relationship("Quests", back_populates="users")
 
+    def __repr__(self):
+        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
+                f"date_completed={self.date_completed}, is_verified={self.is_verified} )>")
+
+class QuestVerification(Base):
+    __tablename__ = 'quests_verification'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_quest_id = Column(Integer, ForeignKey('user_quests.id'), nullable=False)
+    verifier_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    verified_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     def __repr__(self):
-        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-                f"date_completed={self.date_completed})>")
+        return (f"<QuestsVerification(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
+                f"verifier_id={self.verifier_id}, verified_at={self.verified_at})>")
