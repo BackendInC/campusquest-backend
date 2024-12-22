@@ -25,7 +25,7 @@ services:
     image: ${ECR_REGISTRY}/campusbackend-fastapi:${IMAGE_TAG}
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: dockerfile
     ports:
       - "8000:8000"
     environment:

@@ -1,7 +1,8 @@
 import jwt
 from datetime import datetime, timedelta
-from fastapi import HTTPException, Security
+from fastapi import HTTPException, Security, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from db import models, get_db, Session
 
 # Secret key to sign the token
 SECRET_KEY = "your-secret-key"
@@ -36,8 +37,17 @@ def decode_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -
         raise HTTPException(status_code=401, detail="Invalid token!")
 
 
-def check_admin(credentials: HTTPAuthorizationCredentials = Security(security)):
+# Same as decode_jwt but for admin users only
+def verify_admin(
+    credentials: HTTPAuthorizationCredentials = Security(security),
+    db: Session = Depends(get_db),
+) -> int:
     user_id = decode_jwt(credentials)
-    if user_id != 1:
-        raise HTTPException(status_code=403, detail="You are not an admin!")
-    return user_id
+
+    # Check if the user is an admin
+    if models.Admin.verify_admin(user_id, db):
+        return user_id
+    else:
+        raise HTTPException(
+            status_code=401, detail="User is not authorized to perform this action"
+        )

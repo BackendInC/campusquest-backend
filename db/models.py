@@ -44,6 +44,7 @@ class User(Base):
     date_of_birth = Column(Date, nullable=True)
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
+    is_email_verified = Column(Boolean, nullable=False, default=False)
 
     is_email_verified = Column(Boolean, nullable=False, default=False)
 
