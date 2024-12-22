@@ -17,6 +17,8 @@ from sqlalchemy import (
     UniqueConstraint,
     Float,
     Boolean,
+    or_,
+    and_,
 )
 
 from sqlalchemy.orm import Session, relationship
@@ -24,6 +26,9 @@ from datetime import datetime, timezone, timedelta
 from db import Base
 import base64
 import os
+from fastapi import HTTPException
+
+
 
 class User(Base):
     __tablename__ = "users"
@@ -126,26 +131,6 @@ class Quests(Base):
             f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
             f"date_due={self.date_due}, user_id={self.user_id})>"
         )
-
-
-class UserQuests(Base):
-    __tablename__ = "user_quests"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
-    date_completed = Column(DateTime, default=datetime.now(timezone.utc))
-
-    # Relationships
-    user = relationship("User", back_populates="quests")
-    quest = relationship("Quests", back_populates="users")
-
-    def __repr__(self):
-        return (
-            f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-            f"date_completed={self.date_completed})>"
-        )
-
 
 class Posts(Base):
     __tablename__ = "posts"
@@ -363,7 +348,129 @@ class QuestVerification(Base):
     user_quest_id = Column(Integer, ForeignKey('user_quests.id'), nullable=False)
     verifier_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     verified_at = Column(DateTime, default=datetime.now(timezone.utc))
-
     def __repr__(self):
         return (f"<QuestsVerification(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
                 f"verifier_id={self.verifier_id}, verified_at={self.verified_at})>")
+
+class Friends(Base):
+    __tablename__ = "friends"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    #relationships
+    user = relationship("User", foreign_keys=[user_id])
+    friend = relationship("User", foreign_keys=[friend_id])
+
+    # Ensure that a user cannot be friends with the same user twice
+    __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
+
+    def __repr__(self):
+        return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
+    
+    @staticmethod
+    def are_friends(user_id, friend_id, db) -> bool:
+        # Check if the users are already friends
+        return db.query(Friends).filter(
+            or_(
+                and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
+                and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
+            )
+        ).first() is not None
+    
+    @staticmethod
+    def create_friend(user_id, friend_id, db) -> "Friends":
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if friend_user is None:
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #prevent adding yourself as a friend
+        if user_id == friend_id:
+            raise HTTPException(status_code=400, detail="Cannot add yourself as a friend")
+        
+        #check if the user is already friends with the friend
+        if Friends.are_friends(user_id, friend_id, db):
+            raise HTTPException(status_code=400, detail="Already friends with this user")
+        
+        #create a new friend instance
+        new_friend = Friends(
+            user_id=user_id,
+            friend_id=friend_id
+        )
+
+        #add and commit the friend to the database
+        try:
+            db.add(new_friend)
+            db.commit()
+            db.refresh(new_friend)
+
+            return new_friend
+        
+        except HTTPException as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create friend {e}")
+    
+    @staticmethod
+    def remove_friend(user_id, friend_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if not (friend_user or user):
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #prevent removing yourself as a friend
+        if user_id == friend_id:
+            raise HTTPException(status_code=400, detail="Cannot remove yourself as a friend")
+        
+        #check if the user is already friends with the friend
+        friend = Friends.are_friends(user_id, friend_id, db)
+        if friend is None:
+            raise HTTPException(status_code=400, detail="Not friends with this user")
+        
+        #remove the friend
+        try:
+            db.delete(friend)
+            db.commit()
+        
+        except HTTPException as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to remove friend {e}")
+        
+
+    @staticmethod
+    def get_friends(user_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        if user is None:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        #get all friends of the user
+        friends = db.query(Friends).filter(Friends.user_id == user_id).all()
+        return friends
+    
+    @staticmethod
+    def get_mutual_friends(user_id, friend_id, db):
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        #check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if not (friend_user or user):
+            raise HTTPException(status_code=404, detail="Friend not found")
+        
+        #get all friends of the user
+        user_friends = db.query(Friends).filter(Friends.user_id == user_id).all()
+        friend_friends = db.query(Friends).filter(Friends.user_id == friend_id).all()
+
+        #get mutual friends
+        mutual_friends = [friend for friend in user_friends if friend in friend_friends]
+        return mutual_friends

@@ -1,7 +1,7 @@
 # This folder contains the schemes for the responses and requests of the API
 
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, date
 
 
@@ -35,6 +35,18 @@ class UserLogin(BaseModel):
     username: str
     password: str
 
+
+class ProfileInfoResponse(BaseModel):
+    username: str 
+    num_posts: int
+    num_likes: int
+    num_achievements: int
+    num_quests_completed: int
+    num_friends: int
+    post_ids: List[int]
+
+    class Config:
+        orm_mode = True
 
 class AchievementBase(BaseModel):
     description: str
@@ -186,3 +198,22 @@ class QuestVerification(BaseModel):
 
     class Config:
         orm_mode = True
+class FriendBase(BaseModel):
+    user_id: int
+    friend_id: int
+
+    class Config:
+        orm_mode = True
+
+class FriendCreate(FriendBase):
+    id: int # autoincrement id
+
+    class Config:
+        orm_mode = True
+
+class FriendResponse(FriendBase):
+    id: int  # autoincrement id
+
+    class Config:
+        orm_mode = True
+

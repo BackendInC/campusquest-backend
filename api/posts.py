@@ -58,6 +58,28 @@ def read_post(post_id: int, db: Session = Depends(get_db)):
 
     return post
 
+# read all posts by a user
+@router.get("/users/{user_id}/posts", response_model=list[schemas.PostResponse])
+def read_user_posts(
+    user_id: int, 
+    db: Session = Depends(get_db), 
+    current_user: int = Depends(auth.decode_jwt)
+):
+    # check if user exists
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # get all posts by a user
+    posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).all()
+
+    # decode the image as base64
+    for post in posts:
+        if post.image:
+            post.image = base64.b64encode(post.image).decode("utf-8")
+
+    return posts
+
 
 # update a post by id
 @router.put("/posts/{post_id}", response_model=schemas.PostResponse)
