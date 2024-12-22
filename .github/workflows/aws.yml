@@ -64,60 +64,18 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v1
 
-    - name: Build, tag, and push image to Amazon ECR
-      id: build-image
-      env:
-        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        IMAGE_TAG: ${{ github.sha }}
-      run: |
-        # Build a docker container and
-        # push it to ECR so that it can
-        # be deployed to ECS.
-        docker compose build
-        docker compose push
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-
-    - name: Transfer docker-compose.yml to EC2
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USER }}
-        key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        source: ./compose.yaml
-        target: /home/${{ secrets.EC2_USER }}/compose.yaml
-
     - name: Push the new image to EC2 container
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USER }}
         key: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
-        envs: |
-          IMAGE_TAG=${{ github.sha }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          ECR_REGISTRY=${{ steps.login-ecr.outputs.registry }}
         script: |
           echo "AWS CLI version: $(aws --version)"
           echo "Docker version: $(docker --version)"
     
-          echo "Stop the current running container if exist..."
-          docker stop ${CONTAINER_NAME} || true
-    
-          echo "Remove the previous container..."
-          docker rm ${CONTAINER_NAME} || true
-    
-          echo "AWS credentials set...."
-          export AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-          export AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-    
-          echo "Logging in to ECR...."
-          aws ecr get-login-password --region eu-north-1 | docker login --username AWS --password-stdin ${{ secrets.AWS_REGISTRY_URL }}
-          echo "Logged in successful..."
-    
-          echo "Pulling  image from ECR..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml/compose.yaml pull
-          echo "Docker pull completed..."
+          echo "Remove all previous docker images"
+          docker rm -vf $(docker ps -aq)
 
-          echo "Running the containers..."
-          docker-compose -f /home/${{ secrets.EC2_USER }}/compose.yaml/compose.yaml up -d
+          cd campusquest-backend
+          docker-compose -f compose.dev.yaml up -d
