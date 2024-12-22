@@ -7,7 +7,6 @@ from email.mime.text import MIMEText
 
 from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, status
 from sqlalchemy import (
-    Boolean,
     Column,
     Integer,
     String,
@@ -17,12 +16,11 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Float,
+    Boolean,
 )
 
 from sqlalchemy.orm import Session, relationship
 from datetime import datetime, timezone, timedelta
-
-from starlette.status import HTTP_200_OK
 from db import Base
 import base64
 import os
@@ -98,6 +96,7 @@ class UserAchievements(Base):
     achievement_id = Column(Integer, nullable=False)
     date_achieved = Column(DateTime, default=datetime.now(timezone.utc))
 
+
     def __repr__(self):
         return (
             f"<UserAchievements(id={self.id}, user_id={self.user_id}, achievement_id={self.achievement_id}, "
@@ -124,31 +123,9 @@ class Quests(Base):
     users = relationship("UserQuests", back_populates="quest")
 
     def __repr__(self):
-        return (
-            f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
-            f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
-            f"date_due={self.date_due}, user_id={self.user_id})>"
-        )
-
-
-class UserQuests(Base):
-    __tablename__ = "user_quests"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
-    date_completed = Column(DateTime, default=datetime.now(timezone.utc))
-
-    # Relationships
-    user = relationship("User", back_populates="quests")
-    quest = relationship("Quests", back_populates="users")
-
-    def __repr__(self):
-        return (
-            f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-            f"date_completed={self.date_completed})>"
-        )
-
+        return (f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
+                f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
+                f"date_due={self.date_due}, user_id={self.user_id})>")
 
 class Posts(Base):
     __tablename__ = "posts"
@@ -233,6 +210,7 @@ class PostComments(Base):
             f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
             f"content={self.content}, created_at={self.created_at})>"
         )
+
 
 
 class EmailVerificationCode(Base):
@@ -338,3 +316,34 @@ class EmailVerificationCode(Base):
         server.login(fromaddr, "ksgk jaid xekg sdft")
         server.sendmail(fromaddr, toaddrs, msg.as_string())
         server.quit()
+
+
+class UserQuests(Base):
+    __tablename__ = 'user_quests'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer,ForeignKey('users.id'), nullable=False)
+    quest_id = Column(Integer,ForeignKey('quests.id'), nullable=False)
+    is_done = Column(Boolean, default=False, nullable=False)
+    date_completed = Column(DateTime, default=datetime.now(timezone.utc))
+    is_verified = Column(Boolean, default=False, nullable=False)
+
+    # Relationships
+    user = relationship("User", back_populates="quests")
+    quest = relationship("Quests", back_populates="users")
+
+    def __repr__(self):
+        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
+                f"date_completed={self.date_completed}, is_verified={self.is_verified} )>")
+
+class QuestVerification(Base):
+    __tablename__ = 'quests_verification'
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_quest_id = Column(Integer, ForeignKey('user_quests.id'), nullable=False)
+    verifier_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    verified_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    def __repr__(self):
+        return (f"<QuestsVerification(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
+                f"verifier_id={self.verifier_id}, verified_at={self.verified_at})>")
