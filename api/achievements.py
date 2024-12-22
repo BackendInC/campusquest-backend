@@ -23,9 +23,8 @@ def read_achievements(db: Session = Depends(get_db)):
 def create_achievement(
     achievement: schemas.AchievementBase,
     db: Session = Depends(get_db),
-    user_id: dict = Depends(auth.decode_jwt),
+    user_id: int = Depends(auth.verify_admin),
 ):
-    print("USERID", user_id)
     # Create a new Achievement instance
     new_achievement = models.Achievements(
         description=achievement.description, award_tokens=achievement.award_tokens

@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, status
+from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form
 from sqlalchemy import (
     Column,
     Integer,
@@ -25,9 +25,6 @@ from sqlalchemy.orm import Session, relationship
 from datetime import datetime, timezone, timedelta
 from db import Base
 import base64
-import os
-from fastapi import HTTPException
-
 
 
 class User(Base):
@@ -45,6 +42,7 @@ class User(Base):
     date_of_birth = Column(Date, nullable=True)
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
+    is_email_verified = Column(Boolean, nullable=False, default=False)
 
     posts = relationship("Posts", back_populates="user")
     likes = relationship("PostLikes", back_populates="user")
@@ -53,14 +51,27 @@ class User(Base):
     # relationships
     quests = relationship("UserQuests", back_populates="user")
 
-    is_email_verified = Column(Boolean, nullable=False, default=False)
-
     def __repr__(self):
         return (
             f"<User(id={self.id}, username={self.username}, email={self.email}, "
             f"created_at={self.created_at}, num_quests_completed={self.num_quests_completed}, "
             f"tokens={self.tokens})>"
         )
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    def __repr__(self):
+        return f"<Admin(id={self.id}, user_id={self.user_id})>"
+
+    @staticmethod
+    def verify_admin(user_id, db) -> bool:
+        # Check if the user is an admin
+        return db.query(Admin).filter(Admin.user_id == user_id).first() is not None
 
 
 class Sessions(Base):
@@ -131,6 +142,7 @@ class Quests(Base):
             f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
             f"date_due={self.date_due}, user_id={self.user_id})>"
         )
+
 
 class Posts(Base):
     __tablename__ = "posts"
@@ -215,7 +227,6 @@ class PostComments(Base):
             f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
             f"content={self.content}, created_at={self.created_at})>"
         )
-
 
 
 class EmailVerificationCode(Base):
@@ -324,11 +335,11 @@ class EmailVerificationCode(Base):
 
 
 class UserQuests(Base):
-    __tablename__ = 'user_quests'
+    __tablename__ = "user_quests"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer,ForeignKey('users.id'), nullable=False)
-    quest_id = Column(Integer,ForeignKey('quests.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    quest_id = Column(Integer, ForeignKey("quests.id"), nullable=False)
     is_done = Column(Boolean, default=False, nullable=False)
     date_completed = Column(DateTime, default=datetime.now(timezone.utc))
     is_verified = Column(Boolean, default=False, nullable=False)
@@ -338,19 +349,26 @@ class UserQuests(Base):
     quest = relationship("Quests", back_populates="users")
 
     def __repr__(self):
-        return (f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
-                f"date_completed={self.date_completed}, is_verified={self.is_verified} )>")
+        return (
+            f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
+            f"date_completed={self.date_completed}, is_verified={self.is_verified} )>"
+        )
+
 
 class QuestVerification(Base):
-    __tablename__ = 'quests_verification'
+    __tablename__ = "quests_verification"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_quest_id = Column(Integer, ForeignKey('user_quests.id'), nullable=False)
-    verifier_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    user_quest_id = Column(Integer, ForeignKey("user_quests.id"), nullable=False)
+    verifier_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     verified_at = Column(DateTime, default=datetime.now(timezone.utc))
+
     def __repr__(self):
-        return (f"<QuestsVerification(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
-                f"verifier_id={self.verifier_id}, verified_at={self.verified_at})>")
+        return (
+            f"<QuestsVerification(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, "
+            f"verifier_id={self.verifier_id}, verified_at={self.verified_at})>"
+        )
+
 
 class Friends(Base):
     __tablename__ = "friends"
@@ -360,7 +378,7 @@ class Friends(Base):
     friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
-    #relationships
+    # relationships
     user = relationship("User", foreign_keys=[user_id])
     friend = relationship("User", foreign_keys=[friend_id])
 
@@ -369,108 +387,115 @@ class Friends(Base):
 
     def __repr__(self):
         return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
-    
+
     @staticmethod
     def are_friends(user_id, friend_id, db) -> bool:
         # Check if the users are already friends
-        return db.query(Friends).filter(
-            or_(
-                and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
-                and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
+        return (
+            db.query(Friends)
+            .filter(
+                or_(
+                    and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
+                    and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
+                )
             )
-        ).first() is not None
-    
+            .first()
+            is not None
+        )
+
     @staticmethod
     def create_friend(user_id, friend_id, db) -> "Friends":
-        #check if the friend is a user
+        # check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
 
         if friend_user is None:
             raise HTTPException(status_code=404, detail="Friend not found")
-        
-        #prevent adding yourself as a friend
-        if user_id == friend_id:
-            raise HTTPException(status_code=400, detail="Cannot add yourself as a friend")
-        
-        #check if the user is already friends with the friend
-        if Friends.are_friends(user_id, friend_id, db):
-            raise HTTPException(status_code=400, detail="Already friends with this user")
-        
-        #create a new friend instance
-        new_friend = Friends(
-            user_id=user_id,
-            friend_id=friend_id
-        )
 
-        #add and commit the friend to the database
+        # prevent adding yourself as a friend
+        if user_id == friend_id:
+            raise HTTPException(
+                status_code=400, detail="Cannot add yourself as a friend"
+            )
+
+        # check if the user is already friends with the friend
+        if Friends.are_friends(user_id, friend_id, db):
+            raise HTTPException(
+                status_code=400, detail="Already friends with this user"
+            )
+
+        # create a new friend instance
+        new_friend = Friends(user_id=user_id, friend_id=friend_id)
+
+        # add and commit the friend to the database
         try:
             db.add(new_friend)
             db.commit()
             db.refresh(new_friend)
 
             return new_friend
-        
+
         except HTTPException as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create friend {e}")
-    
+
     @staticmethod
     def remove_friend(user_id, friend_id, db):
-        #check if the user is a user
+        # check if the user is a user
         user = db.query(User).filter(User.id == user_id).first()
 
-        #check if the friend is a user
+        # check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
 
         if not (friend_user or user):
             raise HTTPException(status_code=404, detail="Friend not found")
-        
-        #prevent removing yourself as a friend
+
+        # prevent removing yourself as a friend
         if user_id == friend_id:
-            raise HTTPException(status_code=400, detail="Cannot remove yourself as a friend")
-        
-        #check if the user is already friends with the friend
+            raise HTTPException(
+                status_code=400, detail="Cannot remove yourself as a friend"
+            )
+
+        # check if the user is already friends with the friend
         friend = Friends.are_friends(user_id, friend_id, db)
         if friend is None:
             raise HTTPException(status_code=400, detail="Not friends with this user")
-        
-        #remove the friend
+
+        # remove the friend
         try:
             db.delete(friend)
             db.commit()
-        
+
         except HTTPException as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to remove friend {e}")
-        
 
     @staticmethod
     def get_friends(user_id, db):
-        #check if the user is a user
+        # check if the user is a user
         user = db.query(User).filter(User.id == user_id).first()
 
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        #get all friends of the user
+        # get all friends of the user
         friends = db.query(Friends).filter(Friends.user_id == user_id).all()
         return friends
-    
+
     @staticmethod
     def get_mutual_friends(user_id, friend_id, db):
-        #check if the user is a user
+        # check if the user is a user
         user = db.query(User).filter(User.id == user_id).first()
 
-        #check if the friend is a user
+        # check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
 
         if not (friend_user or user):
             raise HTTPException(status_code=404, detail="Friend not found")
-        
-        #get all friends of the user
+
+        # get all friends of the user
         user_friends = db.query(Friends).filter(Friends.user_id == user_id).all()
         friend_friends = db.query(Friends).filter(Friends.user_id == friend_id).all()
 
-        #get mutual friends
+        # get mutual friends
         mutual_friends = [friend for friend in user_friends if friend in friend_friends]
         return mutual_friends

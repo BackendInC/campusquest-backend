@@ -16,7 +16,11 @@ def read_quests(db: Session = Depends(get_db)):
 
 
 @router.post("/quests", response_model=schemas.QuestBase)
-def create_quests(quest: schemas.QuestCreate, db: Session = Depends(get_db)):
+def create_quests(
+    quest: schemas.QuestCreate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(auth.verify_admin),
+):
     # Create a new Achievement instance
     new_quest = models.Quests(
         name=quest.name,
