@@ -78,4 +78,5 @@ jobs:
           docker rm -vf $(docker ps -aq)
 
           cd campusquest-backend
+          git pull origin main
           docker-compose -f compose.dev.yaml up -d
