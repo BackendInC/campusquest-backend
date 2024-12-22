@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import db.models as models
 import api.auth as auth
 
-router = APIRouter()
+router = APIRouter(tags=["quests"])
 
 
 @router.get("/quests", response_model=list[schemas.QuestBase])
@@ -118,10 +118,19 @@ def create_user_quest(quest: schemas.UserQuestsBase, db: Session = Depends(get_d
 
     return {"message": "Quest added successfully"}
 
+
 # is done by the user
 @router.put("/user-quests/{user_quest_id}/complete")
-def complete_user_quest(user_quest_id: int, db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)):
-    user_quest = db.query(models.UserQuests).filter(models.UserQuests.id == user_quest_id).first()
+def complete_user_quest(
+    user_quest_id: int,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user_quest = (
+        db.query(models.UserQuests)
+        .filter(models.UserQuests.id == user_quest_id)
+        .first()
+    )
 
     # basic safeguard
     if user_quest is None:
@@ -132,23 +141,36 @@ def complete_user_quest(user_quest_id: int, db: Session = Depends(get_db), user_
 
     # Authorization check: Ensure the logged-in user is the one associated with the quest
     if user_quest.user_id != user_id:
-        raise HTTPException(status_code=403, detail="User not authorized to complete this quest")
+        raise HTTPException(
+            status_code=403, detail="User not authorized to complete this quest"
+        )
 
     user_quest.is_done = True
     db.commit()
 
     return {"message": "Quest completed successfully"}
 
+
 @router.post("/verify-quest")
-def verify_quest(verification: schemas.QuestVerification, db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)):
+def verify_quest(
+    verification: schemas.QuestVerification,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
     # Retrieve the quest completion record
-    user_quest = db.query(models.UserQuests).filter(models.UserQuests.id == verification.user_quest_id).first()
+    user_quest = (
+        db.query(models.UserQuests)
+        .filter(models.UserQuests.id == verification.user_quest_id)
+        .first()
+    )
 
     if not user_quest:
         raise HTTPException(status_code=404, detail="Quest completion not found")
 
     if not user_quest.is_done:
-        raise HTTPException(status_code=400, detail="Quest not completed yet by the user")
+        raise HTTPException(
+            status_code=400, detail="Quest not completed yet by the user"
+        )
 
     # Check if the quest has already been fully verified
     if user_quest.is_verified:
@@ -156,15 +178,23 @@ def verify_quest(verification: schemas.QuestVerification, db: Session = Depends(
 
     # Ensure the verifier is not the user who completed the quest
     if user_quest.user_id == user_id:
-        raise HTTPException(status_code=403, detail="Cannot verify own quest completion")
+        raise HTTPException(
+            status_code=403, detail="Cannot verify own quest completion"
+        )
 
     # Check if this verifier has already verified this quest
-    existing_verification = db.query(models.QuestVerification).filter(
-        models.QuestVerification.user_quest_id == verification.user_quest_id,
-        models.QuestVerification.verifier_id == user_id
-    ).first()
+    existing_verification = (
+        db.query(models.QuestVerification)
+        .filter(
+            models.QuestVerification.user_quest_id == verification.user_quest_id,
+            models.QuestVerification.verifier_id == user_id,
+        )
+        .first()
+    )
     if existing_verification:
-        raise HTTPException(status_code=400, detail="You have already verified this quest")
+        raise HTTPException(
+            status_code=400, detail="You have already verified this quest"
+        )
 
     # todo add is done if you have time add it to user quest
     # todo existing verification can be done by adding a unique constraint on the PK
@@ -173,14 +203,23 @@ def verify_quest(verification: schemas.QuestVerification, db: Session = Depends(
     # todo testing pytest probably
 
     # Add new verification
-    new_verification = models.QuestVerification(user_quest_id=verification.user_quest_id, verifier_id=user_id)
+    new_verification = models.QuestVerification(
+        user_quest_id=verification.user_quest_id, verifier_id=user_id
+    )
     db.add(new_verification)
     db.commit()
 
     # Check if there are now 2 verifications
-    verification_count = db.query(models.QuestVerification).filter(models.QuestVerification.user_quest_id == verification.user_quest_id).count()
+    verification_count = (
+        db.query(models.QuestVerification)
+        .filter(models.QuestVerification.user_quest_id == verification.user_quest_id)
+        .count()
+    )
     if verification_count >= 2:
         user_quest.is_verified = True
         db.commit()
 
-    return {"message": "Verification successful", "total_verifications": verification_count}
+    return {
+        "message": "Verification successful",
+        "total_verifications": verification_count,
+    }

@@ -13,7 +13,7 @@ import api.auth as auth
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=schemas.UserResponse)
@@ -152,44 +152,60 @@ async def get_profile_picture(username: str, db: session = Depends(get_db)):
 
     # Return the JPEG image
     return Response(content=buffer.getvalue(), media_type="image/jpeg")
+
+
 @router.get("/profile/{user_id}", response_model=schemas.ProfileInfoResponse)
 def get_profile_info(
-    user_id: int, 
-    db: session = Depends(get_db), 
-    current_user: int = Depends(auth.decode_jwt)
+    user_id: int,
+    db: session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
 ):
 
-    #get the user by id
+    # get the user by id
     user = db.query(models.User).filter(models.User.id == user_id).first()
 
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    
-    #count the number of posts
+
+    # count the number of posts
     num_posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).count()
 
-    #count the number of likes
-    num_likes = db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).count()
+    # count the number of likes
+    num_likes = (
+        db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).count()
+    )
 
-    #count the number of achievements
-    num_achievements = db.query(models.UserAchievements).filter(models.UserAchievements.user_id == user_id).count()
+    # count the number of achievements
+    num_achievements = (
+        db.query(models.UserAchievements)
+        .filter(models.UserAchievements.user_id == user_id)
+        .count()
+    )
 
-    #number of completed quests
+    # number of completed quests
     num_quests_completed = user.num_quests_completed
 
-    #get number of friends
-    num_friends = db.query(models.Friends).filter((models.Friends.user_id == user_id) | (models.Friends.friend_id == user_id)).count()
+    # get number of friends
+    num_friends = (
+        db.query(models.Friends)
+        .filter(
+            (models.Friends.user_id == user_id) | (models.Friends.friend_id == user_id)
+        )
+        .count()
+    )
 
-    #get all post ids
-    post_ids = [post.id for post in db.query(models.Posts).filter(models.Posts.user_id == user_id).all()]
-
+    # get all post ids
+    post_ids = [
+        post.id
+        for post in db.query(models.Posts).filter(models.Posts.user_id == user_id).all()
+    ]
 
     return schemas.ProfileInfoResponse(
-        username=user.username, 
-        num_posts=num_posts, 
-        num_likes=num_likes, 
+        username=user.username,
+        num_posts=num_posts,
+        num_likes=num_likes,
         num_achievements=num_achievements,
         num_quests_completed=num_quests_completed,
         num_friends=num_friends,
-        post_ids=post_ids
+        post_ids=post_ids,
     )
