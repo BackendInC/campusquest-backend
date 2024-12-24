@@ -172,8 +172,10 @@ class FriendCreate(FriendBase):
     class Config:
         orm_mode = True
 
-class FriendResponse(FriendBase):
+class FriendResponse(BaseModel):
     id: int  # autoincrement id
+    username: str
+    profile_pic: bytes
 
     class Config:
         orm_mode = True

@@ -89,7 +89,7 @@ async def upload_image(
 
 #get post image
 @router.get("/posts/{post_id}/image", status_code=200)
-def get_image(post_id: int, db: Session = Depends(get_db)):
+async def get_image(post_id: int, db: Session = Depends(get_db)):
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")

@@ -11,6 +11,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Float,
     Enum,
+    Response,
     or_,
     and_,
 )
@@ -289,7 +290,32 @@ class Friends(Base):
             .filter(Friends.user_id == user_id)
             .all()
         )
-        return friends
+
+            # Process friends to include binary profile picture
+        processed_friends = []
+        for friend in friends:
+            if friend.profile_picture:
+                try:
+                    # Decode binary data to an image
+                    image = Image.open(BytesIO(friend.profile_picture))
+                    # Encode the image as JPEG
+                    buffer = BytesIO()
+                    image.save(buffer, format="JPEG")
+                    buffer.seek(0)
+                    profile_picture_binary = buffer.getvalue()
+                except Exception:
+                    profile_picture_binary = None  # Skip corrupted images
+            else:
+                profile_picture_binary = None
+
+        # Append the processed friend data
+        processed_friends.append({
+            "id": friend.id,
+            "username": friend.username,
+            "profile_picture": Response(content=profile_picture_binary, media_type="image/jpeg") if profile_picture_binary else None
+        })
+
+        return processed_friends
 
     
     @staticmethod
