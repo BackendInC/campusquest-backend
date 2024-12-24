@@ -11,6 +11,7 @@ echo "Waiting for postgres to start..."
 sleep 3
 
 export TEST=1
+export DATABASE_URL=postgresql://root:1234@localhost:5432/backendinc
 
 echo "Running tests..."
 python3 -m pytest -v -s

@@ -7,3 +7,4 @@ bcrypt
 pyjwt
 python-multipart
 pillow
+pytest
