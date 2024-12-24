@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
 import base64
+from sqlalchemy import func, case
 
 router = APIRouter()  # create an instance of the APIRouter class
 
@@ -44,37 +45,74 @@ def create_post(
         raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
 
 
-# read all posts
+#read all posts information
 @router.get("/posts", response_model=list[schemas.PostResponse])
 def read_posts(db: Session = Depends(get_db)):
-    # get all posts from the database
-    posts = db.query(models.Posts).all()
+    posts = (
+        db.query(
+            models.Posts.id,
+            models.Posts.user_id,
+            models.Posts.caption,
+            models.Posts.created_at,
+            func.count(
+                case([(models.PostReactions.reaction_type == "like", 1)])
+            ).label("likes_count"),
+            func.count(
+                case([(models.PostReactions.reaction_type == "dislike", 1)])
+            ).label("dislikes_count"),
+        )
+        .outerjoin(models.PostReactions, models.PostReactions.post_id == models.Posts.id)
+        .group_by(models.Posts.id)
+        .all()
+    )
 
-    # decode the image as base64
-    for post in posts:
-        if post.image:
-            post.image = base64.b64encode(post.image).decode("utf-8")
+    # Map query results to response model
+    return [
+        {
+            "id": post.id,
+            "user_id": post.user_id,
+            "caption": post.caption,
+            "likes_count": post.likes_count,
+            "dislikes_count": post.dislikes_count,
+            "created_at": post.created_at,
+        }
+        for post in posts
+    ]
 
-    return posts
 
-
-# read a post by id
+#read post information by post_id
 @router.get("/posts/{post_id}", response_model=schemas.PostResponse)
 def read_post(post_id: int, db: Session = Depends(get_db)):
-    # get the post by id
+
+    # Get the post by ID
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
 
-    # check if post exists
+    # Check if post exists
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # decode the image as base64
-    if post.image:
-        post.image = base64.b64encode(post.image).decode("utf-8")
+    # Count likes and dislikes for the post
+    likes_count = db.query(func.count(models.PostReactions.id)).filter(
+        models.PostReactions.post_id == post.id,
+        models.PostReactions.reaction_type == "like"
+    ).scalar()
 
-    return post
+    dislikes_count = db.query(func.count(models.PostReactions.id)).filter(
+        models.PostReactions.post_id == post.id,
+        models.PostReactions.reaction_type == "dislike"
+    ).scalar()
 
-# read all posts by a user
+    # Return the response
+    return {
+        "id": post.id,
+        "user_id": post.user_id,
+        "caption": post.caption,
+        "likes_count": likes_count,
+        "dislikes_count": dislikes_count,
+        "created_at": post.created_at,
+    }
+
+# read all posts information by a user
 @router.get("/users/{user_id}/posts", response_model=list[schemas.PostResponse])
 def read_user_posts(
     user_id: int, 
@@ -86,15 +124,37 @@ def read_user_posts(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # get all posts by a user
-    posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).all()
+    # Query posts with aggregated likes and dislikes count
+    posts = (
+        db.query(
+            models.Posts.id,
+            models.Posts.user_id,
+            models.Posts.caption,
+            models.Posts.created_at,
+            func.count(
+                case([(models.PostReactions.reaction_type == "like", 1)])
+            ).label("likes_count"),
+            func.count(
+                case([(models.PostReactions.reaction_type == "dislike", 1)])
+            ).label("dislikes_count"),
+        )\
+        .filter(models.Posts.user_id == user_id)
+        .outerjoin(models.PostReactions, models.PostReactions.post_id == models.Posts.id)
+        .group_by(models.Posts.id)
+        .all()
+    )
 
-    # decode the image as base64
-    for post in posts:
-        if post.image:
-            post.image = base64.b64encode(post.image).decode("utf-8")
-
-    return posts
+    return [
+        {
+            "id": post.id,
+            "user_id": post.user_id,
+            "caption": post.caption,
+            "likes_count": post.likes_count,
+            "dislikes_count": post.dislikes_count,
+            "created_at": post.created_at,
+        }
+        for post in posts
+    ]
 
 
 # update a post by id
@@ -118,9 +178,6 @@ def update_post(
             status_code=403, detail="You are not the owner of this post"
         )
     
-    # decode the image as base64
-    if post_db.image:
-        image_base64 = base64.b64encode(post_db.image).decode("utf-8")
 
     # update the post
     try:
@@ -128,13 +185,7 @@ def update_post(
         db.commit()
         db.refresh(post_db)
 
-        return {
-            "id": post_db.id,
-            "user_id": post_db.user_id,
-            "caption": post_db.caption,
-            "created_at": post_db.created_at,
-            "image": image_base64,
-        }
+        return post_db
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to update post: {str(e)}")
@@ -169,7 +220,7 @@ def delete_post(
 
 
 # like and unlike a post
-@router.post("/posts/{post_id}/like", response_model=schemas.PostLikeResponse)
+@router.post("/posts/{post_id}/like", response_model=schemas.PostReactionResponse)
 def toggle_like(
     post_id: int,
     db: Session = Depends(get_db),
@@ -182,10 +233,11 @@ def toggle_like(
 
     # check if the user has liked the post
     like = (
-        db.query(models.PostLikes)
+        db.query(models.PostReactions)
         .filter(
-            models.PostLikes.user_id == current_user,
-            models.PostLikes.post_id == post_id,
+            models.PostReactions.user_id == current_user,
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "like",
         )
         .first()
     )
@@ -193,7 +245,7 @@ def toggle_like(
     # unlike the post if the user has liked it
     if like:
         try:
-            response = schemas.PostLikeResponse(
+            response = schemas.PostReactionResponse(
                 id=like.id,
                 user_id=like.user_id, 
                 post_id=like.post_id,
@@ -208,20 +260,83 @@ def toggle_like(
             )
 
     # like the post if the user has not liked it
-    new_like = models.PostLikes(user_id=current_user, post_id=post_id)
+    new_like = models.PostReactions(user_id=current_user, post_id=post_id, reaction_type="like")
 
     try:
+        response = schemas.PostReactionResponse(
+            id=like.id,
+            user_id=like.user_id, 
+            post_id=like.post_id,
+            message="Post liked successfully"
+        )
         db.add(new_like)
         db.commit()
         db.refresh(new_like)
-        return new_like
+        return response
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to like post: {str(e)}")
 
+# dislike and remove dislike
+@router.post("/posts/{post_id}/dislike", response_model=schemas.PostLikeResponse)
+def toggle_dislike(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
+):
+    # check if post exists
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
 
+    # check if the user has disliked the post
+    like = (
+        db.query(models.PostReactions)
+        .filter(
+            models.PostReactions.user_id == current_user,
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "dislike",
+        )
+        .first()
+    )
+
+    # undo the dislike if the user has liked it
+    if like:
+        try:
+            response = schemas.PostReactionResponse(
+                id=like.id,
+                user_id=like.user_id, 
+                post_id=like.post_id,
+                message="Dislike removed successfully"
+            )
+            db.delete(like)
+            db.commit()
+            return response
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to remove dislike: {str(e)}"
+            )
+
+    # like the post if the user has not liked it
+    new_like = models.PostReactions(user_id=current_user, post_id=post_id, reaction_type="dislike")
+
+    try:
+        response = schemas.PostReactionResponse(
+            id=like.id,
+            user_id=like.user_id, 
+            post_id=like.post_id,
+            message="Post disliked successfully"
+        )
+        db.add(new_like)
+        db.commit()
+        db.refresh(new_like)
+        return response
+
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to like post: {str(e)}")
+    
 # display all likes for a post
-@router.get("/posts/{post_id}/likes", response_model=list[schemas.PostLikeResponse])
+@router.get("/posts/{post_id}/likes", response_model=list[schemas.PostReactionResponse])
 def read_post_likes(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -229,8 +344,26 @@ def read_post_likes(post_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Post not found")
 
     # get all likes for a post
-    likes = db.query(models.PostLikes).filter(models.PostLikes.post_id == post_id).all()
+    likes = db.query(models.PostReactions).filter(
+        models.PostReactions.post_id == post_id,
+        models.PostReactions.reaction_type == "like"
+        ).all()
     return likes
+
+# display all dislikes for a post
+@router.get("/posts/{post_id}/dislikes", response_model=list[schemas.PostReactionResponse])
+def read_post_dislikes(post_id: int, db: Session = Depends(get_db)):
+    # check if post exists
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # get all likes for a post
+    dislikes = db.query(models.PostReactions).filter(
+        models.PostReactions.post_id == post_id,
+        models.PostReactions.reaction_type == "dislike"
+        ).all()
+    return dislikes
 
 
 # count the number of likes for a post
@@ -243,9 +376,30 @@ def count_post_likes(post_id: int, db: Session = Depends(get_db)):
 
     # count the number of likes for a post
     count = (
-        db.query(models.PostLikes).filter(models.PostLikes.post_id == post_id).count()
+        db.query(models.PostReactions).filter(
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "like"
+            ).count()
     )
     return count
+
+# count the number of dislikes for a post
+@router.get("/posts/{post_id}/dislikes/count", response_model=int)
+def count_post_dislikes(post_id: int, db: Session = Depends(get_db)):
+    # check if post exists
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # count the number of likes for a post
+    count = (
+        db.query(models.PostReactions).filter(
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "dislike"
+            ).count()
+    )
+    return count
+
 
 
 # check if a user has liked a post
@@ -262,14 +416,41 @@ def check_user_like(
 
     # check if the user has liked the post
     like = (
-        db.query(models.PostLikes)
+        db.query(models.PostReactions)
         .filter(
-            models.PostLikes.user_id == current_user,
-            models.PostLikes.post_id == post_id,
+            models.PostReactions.user_id == current_user,
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "like"
         )
         .first()
     )
     if like:
+        return True
+    return False
+
+# check if a user has disliked a post
+@router.get("/posts/{post_id}/dislike", response_model=bool)
+def check_user_dislike(
+    post_id: int,
+    db: Session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
+):
+    # check if post exists
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    # check if the user has liked the post
+    dislike = (
+        db.query(models.PostReactions)
+        .filter(
+            models.PostReactions.user_id == current_user,
+            models.PostReactions.post_id == post_id,
+            models.PostReactions.reaction_type == "dislike"
+        )
+        .first()
+    )
+    if dislike:
         return True
     return False
 
@@ -285,142 +466,32 @@ def read_post_likedby(post_id: int, db: Session = Depends(get_db)):
     # get all users who liked a post
     users = (
         db.query(models.User)
-        .join(models.PostLikes)
-        .filter(models.PostLikes.post_id == post_id)
+        .join(models.PostReactions)
+        .filter(models.PostReactions.post_id == post_id,
+                models.PostReactions.reaction_type == "like"
+                )
         .all()
     )
     return users
+   
 
-
-# comment on a post
-@router.post("/posts/{post_id}/comment", response_model=schemas.PostCommentResponse)
-def create_comment(
-    post_id: int,
-    comment: schemas.PostCommentCreate,
-    db: Session = Depends(get_db),
-    current_user: int = Depends(auth.decode_jwt),
-):
+# read all users who disliked a post
+@router.get("/posts/{post_id}/dislikedby", response_model=list[schemas.UserResponse])
+def read_post_dislikedby(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # create a new comment instance
-    new_comment = models.PostComments(
-        user_id=current_user, post_id=post_id, content=comment.content
-    )
-
-    # add and commit the comment to the database
-    try:
-        db.add(new_comment)
-        db.commit()
-        db.refresh(new_comment)
-        return new_comment
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to create comment: {str(e)}"
-        )
-
-
-# read all comments for a post
-@router.get(
-    "/posts/{post_id}/comments", response_model=list[schemas.PostCommentResponse]
-)
-def read_post_comments(post_id: int, db: Session = Depends(get_db)):
-    # check if post exists
-    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
-    if not post:
-        raise HTTPException(status_code=404, detail="Post not found")
-
-    # get all comments for a post
-    comments = (
-        db.query(models.PostComments)
-        .filter(models.PostComments.post_id == post_id)
+    # get all users who liked a post
+    users = (
+        db.query(models.User)
+        .join(models.PostReactions)
+        .filter(models.PostReactions.post_id == post_id,
+                models.PostReactions.reaction_type == "dislike"
+                )
         .all()
     )
-    return comments
-
-
-# read comment by id
-@router.get("/comments/{comment_id}", response_model=schemas.PostCommentResponse)
-def read_comment(comment_id: int, db: Session = Depends(get_db)):
-    # get the comment by id
-    comment = (
-        db.query(models.PostComments)
-        .filter(models.PostComments.id == comment_id)
-        .first()
-    )
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-    return comment
-
-
-# update a comment by id
-@router.put("/comments/{comment_id}", response_model=schemas.PostCommentResponse)
-def update_comment(
-    comment_id: int,
-    comment: schemas.PostCommentCreate,
-    db: Session = Depends(get_db),
-    current_user: int = Depends(auth.decode_jwt),
-):
-    # get the comment by id
-    comment_db = (
-        db.query(models.PostComments)
-        .filter(models.PostComments.id == comment_id)
-        .first()
-    )
-    if not comment_db:
-        raise HTTPException(status_code=404, detail="Comment not found")
-
-    # check if the user is the owner of the comment
-    if comment_db.user_id != current_user:
-        raise HTTPException(
-            status_code=403, detail="You are not the owner of this comment"
-        )
-
-    # update the comment
-    try:
-        comment_db.content = comment.content
-        db.commit()
-        db.refresh(comment_db)
-
-        return comment_db
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to update comment: {str(e)}"
-        )
-
-
-# delete a comment by id
-@router.delete("/comments/{comment_id}", status_code=200)
-def delete_comment(
-    comment_id: int,
-    db: Session = Depends(get_db),
-    current_user: int = Depends(auth.decode_jwt),
-):
-    # get the comment by id
-    comment = (
-        db.query(models.PostComments)
-        .filter(models.PostComments.id == comment_id)
-        .first()
-    )
-    if not comment:
-        raise HTTPException(status_code=404, detail="Comment not found")
-
-    # check if the user is the owner of the comment
-    if comment.user_id != current_user:
-        raise HTTPException(
-            status_code=403, detail="You are not the owner of this comment"
-        )
-
-    # delete the comment
-    try:
-        db.delete(comment)
-        db.commit()
-        return {"detail": "Comment deleted successfully"}
-    except Exception as e:
-        raise HTTPException(
-            status_code=400, detail=f"Failed to delete comment: {str(e)}"
-        )
+    return users
+   
 

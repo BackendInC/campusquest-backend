@@ -108,7 +108,7 @@ class PostUpdate(BaseModel):
         orm_mode = True
 
 
-class PostLikeBase(BaseModel):
+class PostReactionBase(BaseModel):
     user_id: int
     post_id: int
 
@@ -116,7 +116,7 @@ class PostLikeBase(BaseModel):
         orm_mode = True
 
 
-class PostLikeCreate(BaseModel):
+class PostReactionCreate(BaseModel):
     user_id: int
     post_id: int
 
@@ -124,7 +124,7 @@ class PostLikeCreate(BaseModel):
         orm_mode = True
 
 
-class PostLikeResponse(PostLikeBase):
+class PostReactionResponse(PostReactionBase):
     id: int  # autoincrement id
     message: Optional[str] = None
 
