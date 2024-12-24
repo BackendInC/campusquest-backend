@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, status
+from fastapi import HTTPException
 from sqlalchemy import (
     Column,
     Integer,
@@ -25,9 +25,8 @@ from sqlalchemy.orm import Session, relationship
 from datetime import datetime, timezone, timedelta
 from db import Base
 import base64
-import os
-from fastapi import HTTPException
-
+import api.utils as utils
+import db.schemas as schemas
 
 class User(Base):
     __tablename__ = "users"
@@ -60,6 +59,30 @@ class User(Base):
             f"created_at={self.created_at}, num_quests_completed={self.num_quests_completed}, "
             f"tokens={self.tokens})>"
         )
+
+    @staticmethod
+    def create_user(new_user_params: schemas.UserCreate, db):
+        salt = utils.create_salt()
+        hashed_password = utils.hash_password(new_user_params.password, salt)
+
+        new_user = User(
+            username=new_user_params.username,
+            email=new_user_params.email,
+            password=hashed_password,
+            salt=salt,
+            num_quests_completed=0,
+            tokens=0,
+        )
+
+        db.add(new_user)
+        db.commit()
+        db.refresh(new_user)
+
+        return new_user
+
+    @staticmethod
+    def get_user(user_id, db):
+        return db.query(User).filter(User.id == user_id).first()
 
 
 class Sessions(Base):

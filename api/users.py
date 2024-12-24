@@ -10,6 +10,7 @@ from db import models
 
 import api.utils as utils
 import api.auth as auth
+import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
@@ -18,25 +19,12 @@ router = APIRouter()
 
 @router.post("/users", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
-    # create a new user instance
-
-    salt = utils.create_salt()
-    hashed_password = utils.hash_password(user.password, salt)
-
-    new_user = models.User(
-        username=user.username,
-        email=user.email,
-        password=hashed_password,
-        salt=salt,
-        num_quests_completed=0,
-        tokens=0,
-    )
-
     try:
-        # add and commit the user to the database
-        db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
+        new_user = models.User.create_user(user, db)
+        if os.getenv("TEST") == "1":
+            new_user.is_email_verified = True
+            db.commit()
+            return new_user
 
         verificationInstance = models.EmailVerificationCode(user_id=new_user.id)
 

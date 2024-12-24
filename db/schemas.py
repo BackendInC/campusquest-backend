@@ -37,7 +37,7 @@ class UserLogin(BaseModel):
 
 
 class ProfileInfoResponse(BaseModel):
-    username: str 
+    username: str
     num_posts: int
     num_likes: int
     num_achievements: int
@@ -47,6 +47,7 @@ class ProfileInfoResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class AchievementBase(BaseModel):
     description: str
@@ -158,6 +159,7 @@ class EmailVerificationInput(BaseModel):
     class Config:
         orm_mode = True
 
+
 class QuestBase(BaseModel):
     name: str
     description: str
@@ -193,11 +195,14 @@ class UserQuestsBase(BaseModel):
 class UserQuestsResponse(UserQuestsBase):
     id: int
 
+
 class QuestVerification(BaseModel):
     user_quest_id: int
 
     class Config:
         orm_mode = True
+
+
 class FriendBase(BaseModel):
     user_id: int
     friend_id: int
@@ -205,15 +210,16 @@ class FriendBase(BaseModel):
     class Config:
         orm_mode = True
 
+
 class FriendCreate(FriendBase):
-    id: int # autoincrement id
+    id: int  # autoincrement id
 
     class Config:
         orm_mode = True
+
 
 class FriendResponse(FriendBase):
     id: int  # autoincrement id
 
     class Config:
         orm_mode = True
-
