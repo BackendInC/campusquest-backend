@@ -34,7 +34,7 @@ def list_friends(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #list all friends
-    return models.Friends.list_friends(user_id, db)
+    return models.Friends.get_friends(user_id, db)
 
 #check if a user is a friend
 @router.get("/friends/{friend_id}", response_model=schemas.FriendResponse)
@@ -44,7 +44,7 @@ def check_friend(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #check if a user is a friend
-    return models.Friends.check_friend(user_id, friend_id, db)
+    return models.Friends.are_friends(user_id, friend_id, db)
 
 #get mutual friends
 @router.get("/friends/mutual/{friend_id}", response_model=list[schemas.FriendResponse])

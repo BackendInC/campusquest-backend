@@ -276,15 +276,21 @@ class Friends(Base):
 
     @staticmethod
     def get_friends(user_id, db):
-        #check if the user is a user
+        # Check if the user exists
         user = db.query(User).filter(User.id == user_id).first()
 
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        #get all friends of the user
-        friends = db.query(Friends).filter(Friends.user_id == user_id).all()
+        # Get all friends with additional details
+        friends = (
+            db.query(User.id, User.username, User.profile_picture)
+            .join(Friends, Friends.friend_id == User.id)
+            .filter(Friends.user_id == user_id)
+            .all()
+        )
         return friends
+
     
     @staticmethod
     def get_mutual_friends(user_id, friend_id, db):
