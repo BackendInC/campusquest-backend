@@ -10,6 +10,7 @@ from db import models
 
 import api.utils as utils
 import api.auth as auth
+import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
@@ -20,6 +21,10 @@ router = APIRouter()
 def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
     try:
         new_user = models.User.create_user(user, db)
+        if os.getenv("TEST") == 1:
+            new_user.is_email_verified = True
+            db.commit()
+            return new_user
 
         verificationInstance = models.EmailVerificationCode(user_id=new_user.id)
 
