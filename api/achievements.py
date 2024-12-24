@@ -25,7 +25,6 @@ def create_achievement(
     db: Session = Depends(get_db),
     user_id: dict = Depends(auth.decode_jwt),
 ):
-    print("USERID", user_id)
     # Create a new Achievement instance
     new_achievement = models.Achievements(
         description=achievement.description, award_tokens=achievement.award_tokens
@@ -87,7 +86,3 @@ def create_user_achievement(
     db.refresh(new_user_achievement)
 
     return {"message": "Achievement added successfully"}
-
-
-
-
