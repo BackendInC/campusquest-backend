@@ -10,5 +10,7 @@ docker run --name postgres-test -e POSTGRES_PASSWORD=1234 -e POSTGRES_USER=root 
 echo "Waiting for postgres to start..."
 sleep 3
 
+export TEST=1
+
 echo "Running tests..."
-python3 -m pytest
+python3 -m pytest -v -s

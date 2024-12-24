@@ -21,7 +21,7 @@ router = APIRouter()
 def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
     try:
         new_user = models.User.create_user(user, db)
-        if os.getenv("TEST") == 1:
+        if os.getenv("TEST") == "1":
             new_user.is_email_verified = True
             db.commit()
             return new_user
