@@ -3,6 +3,8 @@ from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
 import base64
+from api.utils import get_user_quest_from
+from quests import complete_user_quest
 
 router = APIRouter()  # create an instance of the APIRouter class
 
@@ -13,19 +15,40 @@ def create_post(
     caption: str = Form(...),
     image: UploadFile = File(...),
     db: Session = Depends(get_db),
+    quest_id: int = Form(...),
     current_user: int = Depends(auth.decode_jwt),
 ):
     # read the image as binary data
+
     image_data = image.file.read()
 
     # create a new post instance
+    user_quest = get_user_quest_from(user_id=current_user, quest_id=quest_id)
+
+    if user_quest is None:
+        raise HTTPException(status_code=404, detail="Quest not found")
+
+    if user_quest.is_done:
+        raise HTTPException(status_code=400, detail="Quest already completed")
+
+    # Authorization check: Ensure the logged-in user is the one associated with the quest
+    if user_quest.user_id != current_user:
+        raise HTTPException(
+            status_code=403, detail="User not authorized to complete this quest"
+        )
+
+    user_quest.is_done = True
     new_post = models.Posts(
         user_id=current_user,
         caption=caption,
         image=image_data,
+        user_quest_id=user_quest.id,
     )
 
-    return models.Posts.create(new_post, db)
+    post = models.Posts.create(new_post, db)
+
+    db.commit()
+    return post
 
 
 # read all posts
@@ -58,18 +81,19 @@ def read_post(post_id: int, db: Session = Depends(get_db)):
 
     return post
 
+
 # read all posts by a user
 @router.get("/users/{user_id}/posts", response_model=list[schemas.PostResponse])
 def read_user_posts(
-    user_id: int, 
-    db: Session = Depends(get_db), 
-    current_user: int = Depends(auth.decode_jwt)
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
 ):
     # check if user exists
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     # get all posts by a user
     posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).all()
 
