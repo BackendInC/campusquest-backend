@@ -194,6 +194,8 @@ class UserQuestsBase(BaseModel):
 
 class UserQuestsResponse(UserQuestsBase):
     id: int
+    is_done: bool
+    is_verified: bool
 
 
 class QuestVerification(BaseModel):
