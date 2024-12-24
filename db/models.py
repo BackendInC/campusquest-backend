@@ -28,6 +28,7 @@ import base64
 import api.utils as utils
 import db.schemas as schemas
 
+
 class User(Base):
     __tablename__ = "users"
 
@@ -43,13 +44,6 @@ class User(Base):
     date_of_birth = Column(Date, nullable=True)
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
-
-    posts = relationship("Posts", back_populates="user")
-    likes = relationship("PostLikes", back_populates="user")
-    comments = relationship("PostComments", back_populates="user")
-
-    # relationships
-    quests = relationship("UserQuests", back_populates="user")
 
     is_email_verified = Column(Boolean, nullable=False, default=False)
 
@@ -145,7 +139,6 @@ class Quests(Base):
     date_posted = Column(DateTime, default=datetime.now(timezone.utc))
 
     # Relationships
-    users = relationship("UserQuests", back_populates="quest")
 
     def __repr__(self):
         return (
@@ -164,18 +157,6 @@ class Posts(Base):
     image = Column(LargeBinary, nullable=True)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     user_quest_id = Column(Integer, ForeignKey("user_quests.id"), nullable=False)
-
-    user = relationship("User")
-    likes = relationship(
-        "PostLikes", back_populates="post", cascade="all, delete-orphan"
-    )
-    comments = relationship(
-        "PostComments", back_populates="post", cascade="all, delete-orphan"
-    )
-
-    userquest = relationship(
-        "UserQuests", back_populates="post", cascade="all, delete-orphan"
-    )
 
     def __repr__(self):
         return (
@@ -216,9 +197,6 @@ class PostLikes(Base):
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
 
-    post = relationship("Posts", back_populates="likes")
-    user = relationship("User", back_populates="likes")
-
     def __repr__(self):
         return (
             f"<PostLikes(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
@@ -234,9 +212,6 @@ class PostComments(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     content = Column(String(500), nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
-
-    post = relationship("Posts", back_populates="comments")
-    user = relationship("User", back_populates="comments")
 
     def __repr__(self):
         return (
@@ -361,11 +336,6 @@ class UserQuests(Base):
     is_verified = Column(Boolean, default=False, nullable=False)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=True)
 
-    # Relationships
-    user = relationship("User", back_populates="quests")
-    quest = relationship("Quests", back_populates="users")
-    post = relationship("Post", back_populates="posts")
-
     def __repr__(self):
         return (
             f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
@@ -395,10 +365,6 @@ class Friends(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
-
-    # relationships
-    user = relationship("User", foreign_keys=[user_id])
-    friend = relationship("User", foreign_keys=[friend_id])
 
     # Ensure that a user cannot be friends with the same user twice
     __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
