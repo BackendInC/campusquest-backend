@@ -82,7 +82,6 @@ class PostBase(BaseModel):
 
 class PostCreate(BaseModel):
     user_id: int
-    image: bytes
     caption: str
 
     class Config:

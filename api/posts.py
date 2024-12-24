@@ -1,30 +1,28 @@
-from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form
+from fastapi import Depends, HTTPException, APIRouter, File, UploadFile, Form, Response
 from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
 import base64
 from sqlalchemy import func, case
+from io import BytesIO
+from PIL import Image
 
-router = APIRouter()  # create an instance of the APIRouter class
+MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
+router = APIRouter()
 
 # create a new post
 @router.post("/posts", response_model=schemas.PostResponse)
 def create_post(
-    caption: str = Form(...),
-    image: UploadFile = File(...),
+    post_data: schemas.PostCreate,
     db: Session = Depends(get_db),
     current_user: int = Depends(auth.decode_jwt),
 ):
-    
-    # read the image as binary data
-    image_data = image.file.read()
 
     # create a new post instance
     new_post = models.Posts(
         user_id=current_user,
-        caption=caption,
-        image=image_data,
+        caption=post_data.caption
     )
 
     # add and commit the post to the database
@@ -38,12 +36,79 @@ def create_post(
             "user_id": new_post.user_id,
             "caption": new_post.caption,
             "created_at": new_post.created_at,
-            "image": base64.b64encode(new_post.image).decode("utf-8"),  #encode the image as base64
         }
     
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
 
+
+#upload an image for the post
+@router.post("/posts/{post_id}/image", status_code=200)
+async def upload_image(
+    post_id: int,
+    image: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
+):
+    #check for file type
+    if image.content_type not in ["image/jpeg", "image/png"]:
+        raise HTTPException(status_code=400, detail="Invalid file type")
+
+    contents = await image.read()
+
+    #check for file size
+    if len(contents) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File size too large")
+    
+    image = Image.open(BytesIO(contents))
+
+    #convert and encode as JPEG for consistency
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG", quality=85)
+    buffer.seek(0)
+
+
+    #store the binary data in the database
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+    
+    post.image = buffer.getvalue()
+
+    try:
+        db.commit()
+        db.refresh(post)
+        return {"message": "Image uploaded successfully"}
+    
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to upload image: {e}"
+        )
+    
+
+#get post image
+@router.get("/posts/{post_id}/image", status_code=200)
+def get_image(post_id: int, db: Session = Depends(get_db)):
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    if not post:
+        raise HTTPException(status_code=404, detail="Post not found")
+
+    if not post.image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    try:
+        image = Image.open(BytesIO(post.image))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get image: {e}")
+    
+
+    #encode the image as JPEG
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    buffer.seek(0)
+
+    return Response(content=buffer.getvalue(), media_type="image/jpeg")
 
 #read all posts information
 @router.get("/posts", response_model=list[schemas.PostResponse])
