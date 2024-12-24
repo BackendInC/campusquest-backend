@@ -15,7 +15,15 @@ def read_quests(db: Session = Depends(get_db)):
     return achievements
 
 
-@router.post("/quests", response_model=schemas.QuestBase)
+
+@router.get("/quests/{quest_id}", response_model=schemas.QuestRead)
+def read_quests(quest_id: int,db: Session = Depends(get_db)):
+    # Get all achievements from the database
+    achievements = db.query(models.Quests).filter(models.Quests.id == quest_id).first()
+    return achievements
+
+
+@router.post("/quests", response_model=schemas.QuestRead)
 def create_quests(quest: schemas.QuestCreate, db: Session = Depends(get_db)):
     # Create a new Achievement instance
     new_quest = models.Quests(
@@ -78,7 +86,7 @@ def update_quest(
         return existing_quest
 
 
-@router.get("/quests/{user_id}", response_model=list[schemas.UserQuestsResponse])
+@router.get("/quests/user/{user_id}", response_model=list[schemas.UserQuestsResponse])
 def read_user_quests(user_id: int, db: Session = Depends(get_db)):
     user_quests = (
         db.query(models.UserQuests).filter(models.UserQuests.user_id == user_id).all()

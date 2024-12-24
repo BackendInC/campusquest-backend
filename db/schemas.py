@@ -176,6 +176,11 @@ class QuestCreate(QuestBase):
     class Config:
         orm_mode = True
 
+class QuestRead(QuestBase):
+    id : int
+    class Config:
+        orm_mode = True
+
 
 class QuestDelete(BaseModel):
     id: int
