@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Float,
+    Enum,
     or_,
     and_,
 )
@@ -17,6 +18,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime, timezone, timedelta
 from db import Base
 from fastapi import HTTPException
+import enum
 
 
 
@@ -137,12 +139,18 @@ class Posts(Base):
         )
 
 
-class PostLikes(Base):
-    __tablename__ = "post_likes"
+class ReactionType(enum.Enum):
+    LIKE = "like"
+    DISLIKE = "dislike"
+
+
+class PostReactions(Base):
+    __tablename__ = "post_reactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reaction_type = Column(Enum(ReactionType), nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
@@ -153,27 +161,9 @@ class PostLikes(Base):
     def __repr__(self):
         return (
             f"<PostLikes(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"created_at={self.created_at})>"
+            f"reaction_type={self.reaction_type}, created_at={self.created_at})>"
         )
 
-
-class PostComments(Base):
-    __tablename__ = "post_comments"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content = Column(String(500), nullable=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-
-    post = relationship("Posts", back_populates="comments")
-    user = relationship("User", back_populates="comments")
-
-    def __repr__(self):
-        return (
-            f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"content={self.content}, created_at={self.created_at})>"
-        )
 
 class UserQuests(Base):
     __tablename__ = 'user_quests'
