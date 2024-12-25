@@ -94,7 +94,7 @@ def read_user_quests(user_id: int, db: Session = Depends(get_db)):
     return user_quests
 
 
-@router.post("/quests/start/{quest_id}", status_code=200)
+@router.post("/quests/start/{quest_id}", status_code=200, response_model=schemas.UserQuestsResponse)
 def create_user_quest(
     quest_id: int,
     db: Session = Depends(get_db),
@@ -103,8 +103,8 @@ def create_user_quest(
     user_quest = (
         db.query(models.UserQuests)
         .filter(
-            models.UserQuests.user_id == quest_id.user_id,
-            models.UserQuests.quest_id == quest_id.quest_id,
+            models.UserQuests.user_id == user_id,
+            models.UserQuests.quest_id == quest_id,
         )
         .first()
     )
@@ -123,8 +123,7 @@ def create_user_quest(
     db.commit()
     db.refresh(new_user_quest)
 
-    return {"message": "Quest added successfully"}
-
+    return new_user_quest
 
 # is done by the user
 # TODO Please refactor the functions below to use quest_id instead of user_quest_id
