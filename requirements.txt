@@ -8,4 +8,5 @@ pyjwt
 python-multipart
 pillow
 pytest
+pytest-cov
 numpy

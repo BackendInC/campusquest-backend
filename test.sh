@@ -14,4 +14,4 @@ export TEST=1
 export DATABASE_URL=postgresql://root:1234@localhost:5432/backendinc
 
 echo "Running tests..."
-python3 -m pytest -v -s
+python3 -m pytest --cov --cov-report=html:coverage_re -v -s
