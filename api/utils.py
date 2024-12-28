@@ -27,3 +27,7 @@ def get_random_string(length: int) -> str:
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=length
         )
     )
+
+
+def get_random_int() -> int:
+    return random.randint(1, 1000)
