@@ -7,7 +7,7 @@ import base64
 router = APIRouter()  # create an instance of the APIRouter class
 
 
-@router.post("/users/verifiy", status_code=200)
+@router.post("/users/verify", status_code=200)
 def verify(
     code_user_id: schemas.EmailVerificationInput,
     db: Session = Depends(get_db),

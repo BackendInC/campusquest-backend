@@ -39,7 +39,7 @@ def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="username or email already exists")
 
 
-@router.post("/user/login", status_code=200)
+@router.post("/users/login", status_code=200)
 def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     # get the user by username
     user: models.User = (
@@ -75,7 +75,7 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     return {"jwt_token": new_session.session_token}
 
 
-@router.post("/user/profile_picture/upload", status_code=200)
+@router.post("/users/profile_picture/upload", status_code=200)
 async def upload_profile_picture(
     profile_picture: UploadFile = File(...),
     db: session = Depends(get_db),
@@ -117,7 +117,7 @@ async def upload_profile_picture(
     return {"message": "Profile picture uploaded successfully"}
 
 
-@router.get("/user/profile_picture/{username}", status_code=200)
+@router.get("/users/profile_picture/{username}", status_code=200)
 async def get_profile_picture(username: str, db: session = Depends(get_db)):
     user: models.User = (
         db.query(models.User).filter(models.User.username == username).first()
@@ -142,7 +142,7 @@ async def get_profile_picture(username: str, db: session = Depends(get_db)):
     return Response(content=buffer.getvalue(), media_type="image/jpeg")
 
 
-@router.get("/user/{user_id}", response_model=schemas.ProfileInfoResponse)
+@router.get("/users/{user_id}", response_model=schemas.ProfileInfoResponse)
 def get_profile_info(
     user_id: int,
     db: session = Depends(get_db),
