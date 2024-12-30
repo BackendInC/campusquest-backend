@@ -50,9 +50,8 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
 
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    # TODO:
-    # if not user.is_email_verified:
-    #    raise HTTPException(status_code=401, detail="User is not verified")
+    if not user.is_email_verified:
+        raise HTTPException(status_code=401, detail="User is not verified")
     # check if the password is correct
     hashed_password = utils.hash_password(userRequest.password, user.salt)
     if hashed_password != user.password:
