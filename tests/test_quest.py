@@ -1,11 +1,13 @@
 from tests.test_users import create_random_user
+
+
 # TODO add admin functionality
 def login(client, db_session, user):
-    response = client.post("/user/login", json={
-        "username": user["username"],
-        "password": "password"
-    })
+    response = client.post(
+        "/users/login", json={"username": user["username"], "password": "password"}
+    )
     return response.json()
+
 
 def test_create_quest(client, db_session):
     user = create_random_user(client, db_session).json()
@@ -27,6 +29,7 @@ def test_create_quest(client, db_session):
     )
 
     assert quest.status_code == 200
+
 
 def test_get_quest(client, db_session):
     user = create_random_user(client, db_session).json()
@@ -53,9 +56,11 @@ def test_get_quest(client, db_session):
     assert response.status_code == 200
     assert response.json()["name"] == "Test Quest"
 
+
 def test_non_admin_quest_create(client, db_session):
     assert True == True
     # TODO: Implement this test ADD ADMIN FUNC.
+
 
 def test_delete_quest(client, db_session):
     user = create_random_user(client, db_session).json()
@@ -77,6 +82,7 @@ def test_delete_quest(client, db_session):
 
     response = client.delete(f"/quests/{quest['id']}")
     assert response.status_code == 204
+
 
 def test_update_quest(client, db_session):
     user = create_random_user(client, db_session).json()
@@ -108,9 +114,10 @@ def test_update_quest(client, db_session):
             "end_date": "2022-01-02",
             "image": "image",
         },
-        headers={"Authorization": f"Bearer {jwt['jwt_token']}",
-    })
+        headers={
+            "Authorization": f"Bearer {jwt['jwt_token']}",
+        },
+    )
 
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Quest"
-
