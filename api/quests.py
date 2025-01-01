@@ -8,16 +8,16 @@ import api.auth as auth
 router = APIRouter()
 
 
-@router.get("/quests", response_model=list[schemas.QuestBase])
+@router.get("/quests", response_model=list[schemas.QuestRead])
 def read_quests(db: Session = Depends(get_db)):
     # Get all achievements from the database
     achievements = db.query(models.Quests).all()
+    print(achievements)
     return achievements
 
 
-
 @router.get("/quests/{quest_id}", response_model=schemas.QuestRead)
-def read_quests(quest_id: int,db: Session = Depends(get_db)):
+def read_quest(quest_id: int, db: Session = Depends(get_db)):
     # Get all achievements from the database
     achievements = db.query(models.Quests).filter(models.Quests.id == quest_id).first()
     return achievements

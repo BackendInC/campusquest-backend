@@ -140,9 +140,9 @@ class Quests(Base):
 
     def __repr__(self):
         return (
-            f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
-            f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
-            f"date_due={self.date_due}, user_id={self.user_id})>"
+            f"<Quest(id={self.id}, title={self.name}, description={self.description}, "
+            f"reward_tokens={self.points}, date_posted={self.date_posted}, "
+            f"date_due={self.end_date}"
         )
 
 
