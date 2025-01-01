@@ -9,8 +9,8 @@ router = APIRouter()  # create an instance of the APIRouter class
 
 @router.post("/users/verify", status_code=200)
 def verify(
-    code_user_id: schemas.EmailVerificationInput,
+    code_user: schemas.EmailVerificationInput,
     db: Session = Depends(get_db),
 ):
-    models.EmailVerificationCode.verify(code_user_id.code, code_user_id.user_id, db)
-    return {"message": f"{code_user_id}"}
+    models.EmailVerificationCode.verify(code_user.code, code_user.username, db)
+    return {"message": f"{code_user}"}

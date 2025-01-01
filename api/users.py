@@ -19,23 +19,30 @@ router = APIRouter()
 
 @router.post("/users", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
+    new_user = None
     try:
         new_user = models.User.create_user(user, db)
         if os.getenv("TEST") == "1":
             new_user.is_email_verified = True
             db.commit()
+            db.refresh(new_user)
             return new_user
 
-        verificationInstance = models.EmailVerificationCode(user_id=new_user.id)
-
-        models.EmailVerificationCode.create(verificationInstance, db)
-        models.EmailVerificationCode.send_email(
-            verificationInstance.code, new_user.email
-        )
-
+        verificationInstance = models.EmailVerificationCode(username=new_user.username)
+        try:
+            models.EmailVerificationCode.create(verificationInstance, db)
+            models.EmailVerificationCode.send_email(
+                verificationInstance.code, new_user.email
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=e)
+        db.commit()
+        db.refresh(new_user)
         return new_user
 
     except exc.sa_exc.IntegrityError:
+        db.rollback()
         raise HTTPException(status_code=400, detail="username or email already exists")
 
 

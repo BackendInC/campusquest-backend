@@ -153,7 +153,7 @@ class PostCommentResponse(PostCommentBase):
 
 
 class EmailVerificationInput(BaseModel):
-    user_id: int
+    username: str
     code: int
 
     class Config:
@@ -176,8 +176,10 @@ class QuestCreate(QuestBase):
     class Config:
         orm_mode = True
 
+
 class QuestRead(QuestBase):
-    id : int
+    id: int
+
     class Config:
         orm_mode = True
 
