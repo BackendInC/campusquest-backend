@@ -77,8 +77,11 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         print(new_session)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
-
-    return {"jwt_token": new_session.session_token}
+    print(user)
+    return {
+        "jwt_token": new_session.session_token,
+        "user": {"id": user.id, "username": user.username, "email": user.email},
+    }
 
 
 @router.post("/users/profile_picture/upload", status_code=200)
