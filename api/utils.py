@@ -27,9 +27,3 @@ def get_random_string(length: int) -> str:
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=length
         )
     )
-
-
-def get_user_quest_from(user_id: int, quest_id: int, db: Session = Depends(get_db)):
-    return (
-        db.query(models.UserQuests).filter(user_id=user_id, quest_id=quest_id).first()
-    )

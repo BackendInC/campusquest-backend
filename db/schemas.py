@@ -153,7 +153,7 @@ class PostCommentResponse(PostCommentBase):
 
 
 class EmailVerificationInput(BaseModel):
-    user_id: int
+    username: str
     code: int
 
     class Config:
@@ -177,6 +177,13 @@ class QuestCreate(QuestBase):
         orm_mode = True
 
 
+class QuestRead(QuestBase):
+    id: int
+
+    class Config:
+        orm_mode = True
+
+
 class QuestDelete(BaseModel):
     id: int
 
@@ -195,7 +202,9 @@ class UserQuestsBase(BaseModel):
 class UserQuestsResponse(UserQuestsBase):
     id: int
     is_done: bool
+    date_completed: datetime
     is_verified: bool
+    post_id: int
 
 
 class QuestVerification(BaseModel):
