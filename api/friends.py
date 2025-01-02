@@ -58,4 +58,3 @@ def get_mutual_friends(
 ):
     # get mutual friends
     return models.Friends.get_mutual_friends(user_id, friend_id, db)
-
