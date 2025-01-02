@@ -3,10 +3,15 @@ from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
 import base64
-from api.utils import get_user_quest_from
-from quests import complete_user_quest
+from api.quests import complete_user_quest
 
 router = APIRouter()  # create an instance of the APIRouter class
+
+
+def get_user_quest_from(user_id: int, quest_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(models.UserQuests).filter(user_id=user_id, quest_id=quest_id).first()
+    )
 
 
 # create a new post
