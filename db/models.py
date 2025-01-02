@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 
-from fastapi import HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 from sqlalchemy import (
     Column,
     Integer,
@@ -69,8 +69,6 @@ class User(Base):
         )
 
         db.add(new_user)
-        db.commit()
-        db.refresh(new_user)
 
         return new_user
 
@@ -142,9 +140,9 @@ class Quests(Base):
 
     def __repr__(self):
         return (
-            f"<Quest(id={self.id}, title={self.title}, description={self.description}, "
-            f"reward_tokens={self.reward_tokens}, date_posted={self.date_posted}, "
-            f"date_due={self.date_due}, user_id={self.user_id})>"
+            f"<Quest(id={self.id}, title={self.name}, description={self.description}, "
+            f"reward_tokens={self.points}, date_posted={self.date_posted}, "
+            f"date_due={self.end_date}"
         )
 
 
@@ -223,7 +221,7 @@ class PostComments(Base):
 class EmailVerificationCode(Base):
     __tablename__ = "verfication_codes"
     code = Column(Integer, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), primary_key=True)
+    username = Column(String, primary_key=True)
     valid_until = Column(
         DateTime, default=datetime.now(timezone.utc) + timedelta(minutes=15)
     )
@@ -235,7 +233,7 @@ class EmailVerificationCode(Base):
             # check if previous code for this user exists that is still valid
             old_code = (
                 db.query(EmailVerificationCode)
-                .filter(EmailVerificationCode.user_id == verificationInstance.user_id)
+                .filter(EmailVerificationCode.username == verificationInstance.username)
                 .first()
             )
 
@@ -250,30 +248,28 @@ class EmailVerificationCode(Base):
                 timezone.utc
             ):
                 db.delete(old_code)
-                db.commit()
 
             # if doesnt exist then save and return the new verificationInstance
             db.add(verificationInstance)
-            db.commit()
 
         except Exception as e:
             raise HTTPException(status_code=500, detail=e)
 
     @staticmethod
-    def verify(code: int, user_id: int, db: Session):
+    def verify(code: int, username: str, db: Session):
         try:
             old_code = (
                 db.query(EmailVerificationCode)
-                .filter(EmailVerificationCode.user_id == user_id)
+                .filter(EmailVerificationCode.username == username)
                 .first()
             )
             if old_code:
                 if old_code.code == code:
-                    user = db.query(User).filter(User.id == user_id).first()
+                    user = db.query(User).filter(User.username == username).first()
                     user.is_email_verified = True
                     db.commit()
                     db.refresh(user)
-                    return {"messsage": f"{code} {user} "}
+                    return {"messsage": f"{code} {user}"}
                 else:
                     raise HTTPException(
                         status_code=500, detail="Wrong verication code."

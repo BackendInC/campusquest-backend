@@ -75,7 +75,6 @@ class UserAchievementResponse(UserAchievementBase):
 
 class PostBase(BaseModel):
     user_id: int
-    image: bytes
     caption: str
     created_at: datetime
 
@@ -85,22 +84,19 @@ class PostBase(BaseModel):
 
 class PostCreate(BaseModel):
     user_id: int
-    image: bytes
     caption: str
 
     class Config:
         orm_mode = True
 
 
-class PostResponse(PostBase):
+class PostResponse(BaseModel):
     id: int  # autoincrement id
     user_id: int
-    image: str
     caption: str
     created_at: datetime
-
-    class Config:
-        orm_mode = True
+    image_url: str
+    quest_id: int
 
 
 class PostUpdate(BaseModel):
@@ -153,7 +149,7 @@ class PostCommentResponse(PostCommentBase):
 
 
 class EmailVerificationInput(BaseModel):
-    user_id: int
+    username: str
     code: int
 
     class Config:
@@ -176,8 +172,10 @@ class QuestCreate(QuestBase):
     class Config:
         orm_mode = True
 
+
 class QuestRead(QuestBase):
-    id : int
+    id: int
+
     class Config:
         orm_mode = True
 
@@ -199,6 +197,23 @@ class UserQuestsBase(BaseModel):
 
 class UserQuestsResponse(UserQuestsBase):
     id: int
+    is_done: bool
+    date_completed: Optional[datetime] = None
+    is_verified: bool
+    post_id: Optional[int] = None
+
+
+class MergedQuestResponse(BaseModel):
+    quest_id: int
+    name: str
+    description: str
+    is_complete: bool
+    is_verified: bool
+    image_url: Optional[str] = None  # Only if user_quest has a post_id
+    post_id: Optional[int] = None
+
+    class Config:
+        orm_mode = True
 
 
 class QuestVerification(BaseModel):

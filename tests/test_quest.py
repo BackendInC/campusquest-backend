@@ -30,6 +30,7 @@ def test_create_quest(client, db_session):
     quest = create_random_quest(client, db_session, jwt)
     assert quest.status_code == 200
 
+
 def test_get_quest(client, db_session):
     user, jwt = create_and_login_user(client, db_session)
     quest = create_random_quest(client, db_session, jwt).json()
@@ -39,15 +40,18 @@ def test_get_quest(client, db_session):
     assert response.status_code == 200
     assert response.json()["name"] == quest["name"]
 
+
 def test_non_admin_quest_create(client, db_session):
     assert True == True
     # TODO: Implement this test ADD ADMIN FUNC.
+
 
 def test_delete_quest(client, db_session):
     user, jwt = create_and_login_user(client, db_session)
     quest = create_random_quest(client, db_session, jwt).json()
     response = client.delete(f"/quests/{quest['id']}")
     assert response.status_code == 204
+
 
 def test_update_quest(client, db_session):
     user, jwt = create_and_login_user(client, db_session)
@@ -70,4 +74,3 @@ def test_update_quest(client, db_session):
 
     assert response.status_code == 200
     assert response.json()["name"] == "Updated Quest"
-

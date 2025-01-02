@@ -19,27 +19,34 @@ router = APIRouter()
 
 @router.post("/users", response_model=schemas.UserResponse)
 def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
+    new_user = None
     try:
         new_user = models.User.create_user(user, db)
         if os.getenv("TEST") == "1":
             new_user.is_email_verified = True
             db.commit()
+            db.refresh(new_user)
             return new_user
 
-        verificationInstance = models.EmailVerificationCode(user_id=new_user.id)
-
-        models.EmailVerificationCode.create(verificationInstance, db)
-        models.EmailVerificationCode.send_email(
-            verificationInstance.code, new_user.email
-        )
-
+        verificationInstance = models.EmailVerificationCode(username=new_user.username)
+        try:
+            models.EmailVerificationCode.create(verificationInstance, db)
+            models.EmailVerificationCode.send_email(
+                verificationInstance.code, new_user.email
+            )
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=e)
+        db.commit()
+        db.refresh(new_user)
         return new_user
 
     except exc.sa_exc.IntegrityError:
+        db.rollback()
         raise HTTPException(status_code=400, detail="username or email already exists")
 
 
-@router.post("/user/login", status_code=200)
+@router.post("/users/login", status_code=200)
 def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     # get the user by username
     user: models.User = (
@@ -50,7 +57,6 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
 
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-
     if not user.is_email_verified:
         raise HTTPException(status_code=401, detail="User is not verified")
     # check if the password is correct
@@ -70,11 +76,14 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
+    print(user)
+    return {
+        "jwt_token": new_session.session_token,
+        "user": {"id": user.id, "username": user.username, "email": user.email},
+    }
 
-    return {"jwt_token": new_session.session_token}
 
-
-@router.post("/user/profile_picture/upload", status_code=200)
+@router.post("/users/profile_picture/upload", status_code=200)
 async def upload_profile_picture(
     profile_picture: UploadFile = File(...),
     db: session = Depends(get_db),
@@ -116,7 +125,7 @@ async def upload_profile_picture(
     return {"message": "Profile picture uploaded successfully"}
 
 
-@router.get("/user/profile_picture/{username}", status_code=200)
+@router.get("/users/profile_picture/{username}", status_code=200)
 async def get_profile_picture(username: str, db: session = Depends(get_db)):
     user: models.User = (
         db.query(models.User).filter(models.User.username == username).first()
@@ -141,7 +150,7 @@ async def get_profile_picture(username: str, db: session = Depends(get_db)):
     return Response(content=buffer.getvalue(), media_type="image/jpeg")
 
 
-@router.get("/user/{user_id}", response_model=schemas.ProfileInfoResponse)
+@router.get("/users/{user_id}", response_model=schemas.ProfileInfoResponse)
 def get_profile_info(
     user_id: int,
     db: session = Depends(get_db),

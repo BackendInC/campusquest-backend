@@ -1,0 +1,6 @@
+Attaching to adminer-1, db-1, fastapi_app-1
+db-1           | 
+db-1           | PostgreSQL Database directory appears to contain a database; Skipping initialization
+db-1           | 
+fastapi_app-1  | Opening connection to database at postgresql://root:1234@10.5.0.2:5432/backendinc?sslmode=disable
+fastapi_app-1  | INFO:     192.168.65.1:54237 - "POST /posts HTTP/1.1" 500 Internal Server Error
