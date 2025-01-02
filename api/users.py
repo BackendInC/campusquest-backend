@@ -74,7 +74,6 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         db.commit()
         db.refresh(new_session)
 
-        print(new_session)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
     print(user)

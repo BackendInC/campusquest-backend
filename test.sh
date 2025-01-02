@@ -13,5 +13,11 @@ sleep 3
 export TEST=1
 export DATABASE_URL=postgresql://root:1234@localhost:5432/backendinc
 
-echo "Running tests..."
-python3 -m pytest -v -s
+# if there is a command argument that run that test
+if [ $# -eq 1 ]; then
+    echo "Running tests in $1..."
+    python3 -m pytest $1 --cov --cov-report=html:coverage_re -v -s
+else
+    echo "Running all tests..."
+    python3 -m pytest --cov --cov-report=html:coverage_re -v -s
+fi

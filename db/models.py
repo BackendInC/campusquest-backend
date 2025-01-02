@@ -110,8 +110,8 @@ class UserAchievements(Base):
     __tablename__ = "user_achievements"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    user_id = Column(Integer, nullable=False)
-    achievement_id = Column(Integer, nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    achievement_id = Column(Integer, ForeignKey("achievements.id"), nullable=False)
     date_achieved = Column(DateTime, default=datetime.now(timezone.utc))
 
     def __repr__(self):

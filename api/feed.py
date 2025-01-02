@@ -48,9 +48,3 @@ def read_friends_posts(db: Session = Depends(get_db), user_id: int = Depends(aut
 
     return posts
 
-# write another get method for image only
-# need one for friends only as well like kenan did
-
-# create 3 users 2 of which friends one is not
-# 1 user the current user will check the 4 feed apis
-# the other 2 users will create a post each
