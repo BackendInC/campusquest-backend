@@ -232,13 +232,6 @@ class FriendBase(BaseModel):
         orm_mode = True
 
 
-class FriendCreate(FriendBase):
-    id: int  # autoincrement id
-
-    class Config:
-        orm_mode = True
-
-
 class FriendResponse(FriendBase):
     id: int  # autoincrement id
 

@@ -8,14 +8,14 @@ router = APIRouter()
 
 
 # add a new friend
-@router.post("/friends", response_model=schemas.FriendResponse)
+@router.post("/friends/{friend_id}", response_model=schemas.FriendResponse)
 def add_friend(
-    friend: schemas.FriendCreate,
+    friend_id: int,
     db: session = Depends(get_db),
     user_id: int = Depends(auth.decode_jwt),
 ):
     # create a new friend instance
-    return models.Friends.create_friend(user_id, friend.friend_id, db)
+    return models.Friends.create_friend(user_id, friend_id, db)
 
 
 # remove a friend
