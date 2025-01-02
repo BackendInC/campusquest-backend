@@ -201,6 +201,10 @@ class UserQuestsBase(BaseModel):
 
 class UserQuestsResponse(UserQuestsBase):
     id: int
+    is_done: bool
+    date_completed: datetime
+    is_verified: bool
+    post_id: int
 
 
 class QuestVerification(BaseModel):
