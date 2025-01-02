@@ -34,7 +34,7 @@ def create_and_login_user(client, db_session):
     user_create_response = create_user(client, db_session, user_data)
     assert user_create_response.status_code == 200
     login_response = client.post(
-        "/user/login",
+        "/users/login",
         json={"username": user_data["username"], "password": user_data["password"]},
     )
 
@@ -106,7 +106,7 @@ def test_user_upload_profile_picture(client, db_session):
     image_file = create_random_image(100, 100)
 
     response = client.post(
-        "/user/profile_picture/upload",
+        "/users/profile_picture/upload",
         files={"profile_picture": ("test_image.png", image_file, "image/png")},
     )
 
@@ -121,7 +121,7 @@ def test_user_upload_profile_picture_invalid_file(client, db_session):
     image_file = create_random_image(100, 100, "RGB", "TIFF")
 
     response = client.post(
-        "/user/profile_picture/upload",
+        "/users/profile_picture/upload",
         files={"profile_picture": ("test_image.tiff", image_file, "image/tiff")},
     )
     assert response.status_code == 400
@@ -134,7 +134,7 @@ def test_user_upload_profile_picture_big_file(client, db_session):
     image_file = create_random_image(5000, 5000)
 
     response = client.post(
-        "/user/profile_picture/upload",
+        "/users/profile_picture/upload",
         files={"profile_picture": ("test_image.png", image_file, "image/png")},
     )
     assert response.status_code == 400
@@ -147,7 +147,7 @@ def test_user_get_profile_picture(client, db_session):
 
     image_file = create_random_image(100, 100, "RGB", "JPEG")
     response = client.post(
-        "/user/profile_picture/upload",
+        "/users/profile_picture/upload",
         files={"profile_picture": ("test_image.jpeg", image_file, "image/jpeg")},
     )
 
@@ -157,7 +157,7 @@ def test_user_get_profile_picture(client, db_session):
 
     # Get the profile
     response = client.get(
-        f"/user/profile_picture/{user_create_response.json()['username']}"
+        f"/users/profile_picture/{user_create_response.json()['username']}"
     )
 
     assert response.status_code == 200
