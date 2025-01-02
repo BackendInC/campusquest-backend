@@ -30,7 +30,7 @@ def remove_friend(
 
 
 # list all friends
-@router.get("/friends", response_model=list[schemas.FriendResponse])
+@router.get("/friends", response_model=list[int])
 def list_friends(
     db: session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)
 ):

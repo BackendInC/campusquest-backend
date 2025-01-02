@@ -31,15 +31,13 @@ def read_posts(db: Session = Depends(get_db)):
 
 
 # get the posts by friends
-@router.get("/feed/friends", response_model=schemas.PostResponse)
+@router.get("/feed/friends", response_model=list[schemas.PostResponse])
 def read_friends_posts(
     db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)
 ):
     # Get user friends
     try:
-        friends = (
-            db.query(models.Friends).filter(models.Friends.user_id == user_id).all()
-        )
+        friends = models.Friends.list_friends(user_id, db)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch friends: {str(e)}"
@@ -52,7 +50,7 @@ def read_friends_posts(
     try:
         posts = (
             db.query(models.Posts)
-            .filter(models.Posts.user_id.in_([friend.friend_id for friend in friends]))
+            .filter(models.Posts.user_id.in_([friend for friend in friends]))
             .order_by(desc(models.Posts.created_at))
             .all()
         )

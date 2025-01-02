@@ -360,17 +360,27 @@ class Friends(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
 
     # Ensure that a user cannot be friends with the same user twice
     __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
 
     def __repr__(self):
-        return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
+        return (
+            f"<Friends("
+            f"id={self.id}, "
+            f"user_id={self.user_id}, "
+            f"friend_id={self.friend_id}, "
+            f"created_at={self.created_at}"
+            f")>"
+        )
 
     @staticmethod
-    def are_friends(user_id, friend_id, db) -> bool:
-        # Check if the users are already friends
+    def are_friends(user_id: int, friend_id: int, db: Session) -> bool:
+        """
+        Returns True if the given two users are friends
+        (in either direction). Otherwise, False.
+        """
         return (
             db.query(Friends)
             .filter(
@@ -384,10 +394,13 @@ class Friends(Base):
         )
 
     @staticmethod
-    def create_friend(user_id, friend_id, db) -> "Friends":
-        # check if the friend is a user
+    def create_friend(user_id: int, friend_id: int, db: Session) -> "Friends":
+        """
+        Creates a friendship between user_id and friend_id, if they
+        are not already friends and not the same user.
+        """
+        # check if the friend_id is a real user
         friend_user = db.query(User).filter(User.id == friend_id).first()
-
         if friend_user is None:
             raise HTTPException(status_code=404, detail="Friend not found")
 
@@ -403,94 +416,109 @@ class Friends(Base):
                 status_code=400, detail="Already friends with this user"
             )
 
-        # create a new friend instance
         new_friend = Friends(user_id=user_id, friend_id=friend_id)
-
-        # add and commit the friend to the database
         try:
             db.add(new_friend)
             db.commit()
             db.refresh(new_friend)
-
             return new_friend
-
-        except HTTPException as e:
+        except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create friend {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create friend: {e}")
 
     @staticmethod
-    def remove_friend(user_id, friend_id, db):
-        # check if the user is a user
-        user = db.query(User).filter(User.id == user_id).first()
-
-        # check if the friend is a user
-        friend_user = db.query(User).filter(User.id == friend_id).first()
-
-        if not (friend_user or user):
-            raise HTTPException(status_code=404, detail="Friend not found")
-
-        # prevent removing yourself as a friend
+    def remove_friend(user_id: int, friend_id: int, db: Session):
+        """
+        Removes a friendship between user_id and friend_id if it exists.
+        """
+        # prevent removing yourself
         if user_id == friend_id:
             raise HTTPException(
                 status_code=400, detail="Cannot remove yourself as a friend"
             )
 
-        # check if the user is friends with the friend_id
+        # check if they are friends
         if not Friends.are_friends(user_id, friend_id, db):
-            raise HTTPException(status_code=400, detail="Not friends with this user")
+            raise HTTPException(
+                status_code=400, detail="You are not friends with this user"
+            )
 
-        friend = (
+        # find the friendship row (in either direction)
+        friend_row = (
             db.query(Friends)
-            .filter(Friends.user_id == user_id, Friends.friend_id == friend_id)
+            .filter(
+                or_(
+                    and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
+                    and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
+                )
+            )
             .first()
         )
 
-        # remove the friend
+        if friend_row is None:
+            raise HTTPException(status_code=404, detail="Friendship not found")
+
         try:
-            db.delete(friend)
+            db.delete(friend_row)
             db.commit()
-
-        except HTTPException as e:
+        except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to remove friend {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to remove friend: {e}")
 
     @staticmethod
-    def get_friends(user_id, db):
-        # check if the user is a user
-        user = db.query(User).filter(User.id == user_id).first()
-
-        if user is None:
-            raise HTTPException(status_code=404, detail="User not found")
-
-        # get all friends of the user
-        friends = db.query(Friends).filter(Friends.user_id == user_id).all()
-        return friends
-
-    @staticmethod
-    def get_mutual_friends(user_id, friend_id, db):
-        # check if the user is a user
-        user = db.query(User).filter(User.id == user_id).first()
-
-        # check if the friend is a user
-        friend_user = db.query(User).filter(User.id == friend_id).first()
-
-        if not (friend_user or user):
-            raise HTTPException(status_code=404, detail="Friend not found")
-
-        # get all friends of the user
-        user_friends = db.query(Friends).filter(Friends.user_id == user_id).all()
-        friend_friends = db.query(Friends).filter(Friends.user_id == friend_id).all()
-
-        # get mutual friends
-        mutual_friends = [friend for friend in user_friends if friend in friend_friends]
-        return mutual_friends
-
-    @staticmethod
-    def list_friends(user_id, db):
-        # check if the user is a user
+    def list_friends(user_id: int, db: Session) -> list[int]:
+        """
+        Returns a list of friend IDs for the given user_id.
+        """
+        # Make sure the user exists
         user = db.query(User).filter(User.id == user_id).first()
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-        # get all friends of the user
-        friends = db.query(Friends).filter(Friends.user_id == user_id).all()
-        return friends
+
+        # Get all friendship rows where the user is either user_id or friend_id
+        friend_rows = (
+            db.query(Friends)
+            .filter(or_(Friends.user_id == user_id, Friends.friend_id == user_id))
+            .all()
+        )
+
+        # Convert those rows to a list of friend user IDs
+        friend_ids = []
+        for frow in friend_rows:
+            if frow.user_id == user_id:
+                friend_ids.append(frow.friend_id)
+            else:
+                friend_ids.append(frow.user_id)
+
+        return friend_ids
+
+    @staticmethod
+    def get_mutual_friends(user_id: int, other_id: int, db: Session) -> list[int]:
+        # Check that both users exist
+        user = db.query(User).filter(User.id == user_id).first()
+        other_user = db.query(User).filter(User.id == other_id).first()
+        if not user or not other_user:
+            raise HTTPException(status_code=404, detail="User(s) not found")
+
+        # all friend IDs for user_id
+        user_friend_ids = set()
+        user_friend_rows = Friends.list_friends(user_id, db)
+        for frow in user_friend_rows:
+            # if user is the 'user_id', friend is the 'friend_id'
+            if frow.user_id == user_id:
+                user_friend_ids.add(frow.friend_id)
+            else:
+                user_friend_ids.add(frow.user_id)
+
+        # all friend IDs for other_id
+        other_friend_ids = set()
+        other_friend_rows = Friends.list_friends(other_id, db)
+        for frow in other_friend_rows:
+            if frow.user_id == other_id:
+                other_friend_ids.add(frow.friend_id)
+            else:
+                other_friend_ids.add(frow.user_id)
+
+        # intersection of both sets
+        mutual_ids = user_friend_ids.intersection(other_friend_ids)
+        return list(mutual_ids)
