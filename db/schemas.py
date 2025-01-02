@@ -202,9 +202,20 @@ class UserQuestsBase(BaseModel):
 class UserQuestsResponse(UserQuestsBase):
     id: int
     is_done: bool
-    date_completed: datetime
+    date_completed: Optional[datetime] = None
     is_verified: bool
-    post_id: int
+    post_id: Optional[int] = None
+
+
+class MergedQuestResponse(BaseModel):
+    quest_id: int
+    name: str
+    description: str
+    is_started: bool
+    user_quest: Optional[UserQuestsResponse] = None
+
+    class Config:
+        orm_mode = True
 
 
 class QuestVerification(BaseModel):

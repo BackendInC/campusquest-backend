@@ -86,12 +86,55 @@ def update_quest(
         return existing_quest
 
 
-@router.get("/quests/user/{user_id}", response_model=list[schemas.UserQuestsResponse])
+@router.get("/quests/user/{user_id}", response_model=list[schemas.MergedQuestResponse])
 def read_user_quests(user_id: int, db: Session = Depends(get_db)):
+    # Get all user_quests for this user
     user_quests = (
         db.query(models.UserQuests).filter(models.UserQuests.user_id == user_id).all()
     )
-    return user_quests
+
+    # Get all quests
+    quests = db.query(models.Quests).all()
+
+    # Create a quick lookup {quest_id: UserQuests}
+    user_quests_map = {uq.quest_id: uq for uq in user_quests}
+
+    # Build the final response list
+    results = []
+    for quest in quests:
+        if quest.id in user_quests_map:
+            # User has started this quest
+            user_quest = user_quests_map[quest.id]
+            results.append(
+                {
+                    "quest_id": quest.id,
+                    "name": quest.name,
+                    "description": quest.description,
+                    "is_started": True,
+                    "user_quest": {
+                        "id": user_quest.id,
+                        "user_id": user_quest.user_id,
+                        "quest_id": user_quest.quest_id,
+                        "is_done": user_quest.is_done,
+                        "date_completed": user_quest.date_completed,
+                        "is_verified": user_quest.is_verified,
+                        "post_id": user_quest.post_id,
+                    },
+                }
+            )
+        else:
+            # User has not started this quest
+            results.append(
+                {
+                    "quest_id": quest.id,
+                    "name": quest.name,
+                    "description": quest.description,
+                    "is_started": False,
+                    # Provide quest fields only, or default user_quest keys if needed.
+                }
+            )
+
+    return results
 
 
 @router.post("/quests/start/{quest_id}", status_code=200)
@@ -103,8 +146,8 @@ def create_user_quest(
     user_quest = (
         db.query(models.UserQuests)
         .filter(
-            models.UserQuests.user_id == quest_id.user_id,
-            models.UserQuests.quest_id == quest_id.quest_id,
+            models.UserQuests.user_id == user_id,
+            models.UserQuests.quest_id == quest_id,
         )
         .first()
     )
