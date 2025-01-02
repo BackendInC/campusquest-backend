@@ -435,10 +435,15 @@ class Friends(Base):
                 status_code=400, detail="Cannot remove yourself as a friend"
             )
 
-        # check if the user is already friends with the friend
-        friend = Friends.are_friends(user_id, friend_id, db)
-        if friend is None:
+        # check if the user is friends with the friend_id
+        if not Friends.are_friends(user_id, friend_id, db):
             raise HTTPException(status_code=400, detail="Not friends with this user")
+
+        friend = (
+            db.query(Friends)
+            .filter(Friends.user_id == user_id, Friends.friend_id == friend_id)
+            .first()
+        )
 
         # remove the friend
         try:
