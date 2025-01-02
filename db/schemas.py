@@ -211,8 +211,9 @@ class MergedQuestResponse(BaseModel):
     quest_id: int
     name: str
     description: str
-    is_started: bool
-    user_quest: Optional[UserQuestsResponse] = None
+    is_complete: bool
+    is_verified: bool
+    image_url: Optional[str] = None  # Only if user_quest has a post_id
 
     class Config:
         orm_mode = True

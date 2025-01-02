@@ -4,6 +4,9 @@ from db import schemas, get_db, models
 import api.auth as auth
 import base64
 from api.quests import complete_user_quest
+from io import BytesIO
+from PIL import Image
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 
 router = APIRouter()  # create an instance of the APIRouter class
 
@@ -436,3 +439,28 @@ def delete_comment(
         raise HTTPException(
             status_code=400, detail=f"Failed to delete comment: {str(e)}"
         )
+
+
+@router.get("/posts/image/{post_id}", status_code=200)
+async def get_post_image(post_id: int, db: Session = Depends(get_db)):
+    post: models.Posts = (
+        db.query(models.Posts).filter(models.Posts.id == post_id).first()
+    )
+    if post is None:
+        raise HTTPException(status_code=404, detail="Post not found")
+    if post.image is None:
+        raise HTTPException(status_code=404, detail="Picture not found")
+
+    # Decode the binary data to an image
+    try:
+        image = Image.open(BytesIO(post.image))
+    except Exception:
+        raise HTTPException(status_code=500, detail="Failed to process image")
+
+    # Encode the image as JPEG
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    buffer.seek(0)
+
+    # Return the JPEG image
+    return Response(content=buffer.getvalue(), media_type="image/jpeg")
