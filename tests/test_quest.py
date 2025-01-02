@@ -2,6 +2,7 @@ from tests.test_users import create_random_user
 from tests.test_users import create_and_login_user
 from api import utils
 import random
+
 # TODO add admin functionality
 
 
@@ -21,6 +22,8 @@ def create_random_quest(client, db_session, jwt):
         headers={"Authorization": f"Bearer {jwt}"},
     )
 
+    assert quest.status_code == 200
+
     return quest
 
 
@@ -36,7 +39,6 @@ def test_get_quest(client, db_session):
     quest = create_random_quest(client, db_session, jwt).json()
 
     response = client.get(f"/quests/{quest['id']}")
-    print(response.json())
     assert response.status_code == 200
     assert response.json()["name"] == quest["name"]
 

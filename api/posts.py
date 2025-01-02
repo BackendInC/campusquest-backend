@@ -3,20 +3,11 @@ from sqlalchemy.orm import Session
 from db import schemas, get_db, models
 import api.auth as auth
 import base64
-from api.quests import complete_user_quest
 from io import BytesIO
 from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
 
 router = APIRouter()  # create an instance of the APIRouter class
-
-
-# create a new post
-from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile
-from fastapi.responses import Response
-from sqlalchemy.orm import Session
-from PIL import Image
-from io import BytesIO
 
 # Example max file size: 5 MB (Adjust as needed)
 MAX_FILE_SIZE = 5 * 1024 * 1024
