@@ -74,10 +74,8 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         db.commit()
         db.refresh(new_session)
 
-        print(new_session)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create session {e}")
-    print(user)
     return {
         "jwt_token": new_session.session_token,
         "user": {"id": user.id, "username": user.username, "email": user.email},

@@ -18,7 +18,6 @@ class UserCreate(BaseModel):
     username: str
     email: str
     password: str
-    date_of_birth: date
 
     class Config:
         orm_mode = True

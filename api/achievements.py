@@ -25,7 +25,6 @@ def create_achievement(
     db: Session = Depends(get_db),
     user_id: dict = Depends(auth.decode_jwt),
 ):
-    print("USERID", user_id)
     # Create a new Achievement instance
     new_achievement = models.Achievements(
         description=achievement.description, award_tokens=achievement.award_tokens
@@ -40,13 +39,17 @@ def create_achievement(
 
 
 @router.get(
-    "/achievements/user/{user_id}", response_model=list[schemas.UserAchievementResponse]
+    "/achievements/user/{username}",
+    response_model=list[schemas.UserAchievementResponse],
 )
-def read_user_achievements(user_id: int, db: Session = Depends(get_db)):
+def read_user_achievements(username: str, db: Session = Depends(get_db)):
+    # Get user
+    user = db.query(models.User).filter(models.User.username == username).first()
+
     # Get all achievements for a user
     user_achievements = (
         db.query(models.UserAchievements)
-        .filter(models.UserAchievements.user_id == user_id)
+        .filter(models.UserAchievements.user_id == user.id)
         .all()
     )
     return user_achievements
@@ -60,6 +63,15 @@ def create_user_achievement(
     user = db.query(models.User).filter(models.User.id == achievement.user_id).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    # Check if achievement exists
+    db_achievement = (
+        db.query(models.Achievements)
+        .filter(models.Achievements.id == achievement.achievement_id)
+        .first()
+    )
+    if db_achievement is None:
+        raise HTTPException(status_code=404, detail="Achievement not found")
 
     # Check if the user already has the achievement
     user_achievement = (
@@ -87,7 +99,3 @@ def create_user_achievement(
     db.refresh(new_user_achievement)
 
     return {"message": "Achievement added successfully"}
-
-
-
-

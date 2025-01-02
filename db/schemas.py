@@ -3,6 +3,7 @@
 from pydantic import BaseModel
 from typing import Optional, List
 from datetime import datetime, date
+from fastapi import UploadFile, File
 
 
 class UserBase(BaseModel):
@@ -83,7 +84,7 @@ class PostBase(BaseModel):
 
 
 class PostCreate(BaseModel):
-    user_id: int
+    quest_id: int
     caption: str
 
     class Config:

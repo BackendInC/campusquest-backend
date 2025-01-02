@@ -196,7 +196,7 @@ def read_logged_in_user_quests(
     return results
 
 
-@router.post("/quests/start/{quest_id}", status_code=200)
+@router.post("/quests/start/{quest_id}", status_code=200, response_model=schemas.UserQuestsResponse)
 def create_user_quest(
     quest_id: int,
     db: Session = Depends(get_db),
@@ -225,8 +225,7 @@ def create_user_quest(
     db.commit()
     db.refresh(new_user_quest)
 
-    return {"message": "Quest added successfully"}
-
+    return new_user_quest
 
 @router.put("/quests/complete/{quest_id}")
 def complete_user_quest(
