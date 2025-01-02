@@ -11,15 +11,12 @@ import base64
 router = APIRouter()
 
 # read all posts no need for authentication since all users can see all posts
+# you need jwt
 @router.get("/posts", response_model=list[schemas.PostResponse])
-def read_posts(db: Session = Depends(get_db)):
+def read_posts(db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)):
+
     # get all posts from the database sorted by created_at
     posts = db.query(models.Posts).order_by(desc(models.Posts.created_at)).all()
-
-    # decode the image as base64
-    for post in posts:
-        if post.image:
-            post.image = base64.b64encode(post.image).decode("utf-8")
 
     return posts
 
@@ -51,3 +48,9 @@ def read_friends_posts(db: Session = Depends(get_db), user_id: int = Depends(aut
 
     return posts
 
+# write another get method for image only
+# need one for friends only as well like kenan did
+
+# create 3 users 2 of which friends one is not
+# 1 user the current user will check the 4 feed apis
+# the other 2 users will create a post each
