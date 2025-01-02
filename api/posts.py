@@ -11,13 +11,18 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Respons
 router = APIRouter()  # create an instance of the APIRouter class
 
 
-def get_user_quest_from(user_id: int, quest_id: int, db: Session = Depends(get_db)):
-    return (
-        db.query(models.UserQuests).filter(user_id=user_id, quest_id=quest_id).first()
-    )
-
-
 # create a new post
+from fastapi import APIRouter, Depends, HTTPException, File, Form, UploadFile
+from fastapi.responses import Response
+from sqlalchemy.orm import Session
+from PIL import Image
+from io import BytesIO
+
+# Example max file size: 5 MB (Adjust as needed)
+MAX_FILE_SIZE = 5 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png"]
+
+
 @router.post("/posts", response_model=schemas.PostResponse)
 def create_post(
     caption: str = Form(...),
@@ -26,37 +31,85 @@ def create_post(
     quest_id: int = Form(...),
     current_user: int = Depends(auth.decode_jwt),
 ):
-    # read the image as binary data
+    try:
+        # 0 Check if the user has a post for this quest+id already
+        user_quest = (
+            db.query(models.UserQuests)
+            .filter(
+                models.UserQuests.user_id == current_user,
+                models.UserQuests.quest_id == quest_id,
+            )
+            .first()
+        )
+        if user_quest is not None:
+            raise HTTPException(status_code=400, detail="User has already submitted.")
 
-    image_data = image.file.read()
+        # 1) Validate file type
+        if image.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400, detail="Invalid file type. Only JPEG or PNG allowed."
+            )
 
-    # create a new post instance
-    user_quest = get_user_quest_from(user_id=current_user, quest_id=quest_id)
+        # 2) Read the raw file contents
+        contents = image.file.read()
 
-    if user_quest is None:
-        raise HTTPException(status_code=404, detail="Quest not found")
+        # 3) Check file size
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File size too large.")
 
-    if user_quest.is_done:
-        raise HTTPException(status_code=400, detail="Quest already completed")
+        # 4) Convert the uploaded file to a JPEG in memory
+        try:
+            input_image = Image.open(BytesIO(contents))
+        except Exception:
+            raise HTTPException(status_code=400, detail="Failed to process image.")
 
-    # Authorization check: Ensure the logged-in user is the one associated with the quest
-    if user_quest.user_id != current_user:
-        raise HTTPException(
-            status_code=403, detail="User not authorized to complete this quest"
+        # Convert to JPEG for consistency
+        buffer = BytesIO()
+        # You can adjust quality as needed
+        input_image.save(buffer, format="JPEG", quality=85)
+        buffer.seek(0)
+        image_data = buffer.getvalue()
+
+        # 5) Create a new UserQuests entry for this user + quest (mark it done)
+
+        new_user_quest = models.UserQuests(
+            user_id=current_user, quest_id=quest_id, is_done=True
+        )
+        db.add(new_user_quest)
+        # Flush so we get new_user_quest.id without committing
+        db.flush()
+
+        # 6) Create the Post referencing the user_quest_id
+        new_post = models.Posts(
+            user_id=current_user,
+            caption=caption,
+            image=image_data,  # Storing the binary data in DB
+            user_quest_id=new_user_quest.id,
         )
 
-    user_quest.is_done = True
-    new_post = models.Posts(
-        user_id=current_user,
-        caption=caption,
-        image=image_data,
-        user_quest_id=user_quest.id,
-    )
+        db.add(new_post)
+        # (Optional) flush again here, or just do a single flush at the end
+        db.flush()
+        # update new_user_quest with post_id
+        new_user_quest.post_id = new_post.id
 
-    post = models.Posts.create(new_post, db)
+        # 7) Commit the transaction
+        db.commit()
 
-    db.commit()
-    return post
+        # 8) Refresh to get the final state (including generated IDs)
+        db.refresh(new_post)
+        return schemas.PostResponse(
+            id=new_post.id,
+            user_id=new_post.user_id,
+            caption=new_post.caption,
+            created_at=new_post.created_at,
+            image_url=f"/posts/image/{new_post.id}",
+            quest_id=new_post.user_quest_id,
+        )
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
 
 
 # read all posts

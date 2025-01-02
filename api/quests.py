@@ -171,6 +171,7 @@ def read_logged_in_user_quests(
                     description=quest.description,
                     is_complete=user_quest.is_done,
                     is_verified=user_quest.is_verified,
+                    post_id=user_quest.post_id,
                     image_url=(
                         f"/posts/image/{user_quest.post_id}"
                         if user_quest.post_id
@@ -188,6 +189,7 @@ def read_logged_in_user_quests(
                     is_complete=False,
                     is_verified=False,
                     image_url=None,
+                    post_id=None,
                 )
             )
 
