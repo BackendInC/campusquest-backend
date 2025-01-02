@@ -6,6 +6,7 @@ from api.email_verification import router as emailRouter
 from api.friends import router as friendsRouter
 from api.posts import router as postsRouter
 from api.feed import router as feedRouter
+from api.admin import router as adminRouter
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -27,3 +28,4 @@ app.include_router(emailRouter)
 app.include_router(friendsRouter)
 app.include_router(postsRouter)
 app.include_router(feedRouter)
+app.include_router(adminRouter)

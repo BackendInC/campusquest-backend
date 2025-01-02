@@ -78,6 +78,53 @@ class User(Base):
         return db.query(User).filter(User.id == user_id).first()
 
 
+class BannedUsers(Base):
+    __tablename__ = "banned_users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    banned_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    reason = Column(String, nullable=False)
+
+    @staticmethod
+    def ban_user(user_id, reason, db):
+        if BannedUsers.is_banned(user_id, db):
+            raise HTTPException(status_code=400, detail="User is already banned")
+        banned_user = BannedUsers(user_id=user_id, reason=reason)
+        db.add(banned_user)
+        db.commit()
+        db.refresh(banned_user)
+        return banned_user
+
+    @staticmethod
+    def is_banned(user_id, db):
+        return (
+            db.query(BannedUsers).filter(BannedUsers.user_id == user_id).first()
+            is not None
+        )
+
+    def __repr__(self):
+        return (
+            f"<BannedUsers(id={self.id}, user_id={self.user_id}, banned_at={self.banned_at}, "
+            f"reason={self.reason})>"
+        )
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    def __repr__(self):
+        return f"<Admin(id={self.id}, user_id={self.user_id})>"
+
+    @staticmethod
+    def verify_admin(user_id, db):
+        return db.query(Admin).filter(Admin.user_id == user_id).first() is not None
+
+
 class Sessions(Base):
     __tablename__ = "sessions"
     id = Column(Integer, primary_key=True, autoincrement=True)
@@ -363,6 +410,10 @@ class Friends(Base):
     friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
+    # relationships
+    user = relationship("User", foreign_keys=[user_id])
+    friend = relationship("User", foreign_keys=[friend_id])
+
     # Ensure that a user cannot be friends with the same user twice
     __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
 
@@ -436,15 +487,10 @@ class Friends(Base):
                 status_code=400, detail="Cannot remove yourself as a friend"
             )
 
-        # check if the user is friends with the friend_id
-        if not Friends.are_friends(user_id, friend_id, db):
+        # check if the user is already friends with the friend
+        friend = Friends.are_friends(user_id, friend_id, db)
+        if friend is None:
             raise HTTPException(status_code=400, detail="Not friends with this user")
-
-        friend = (
-            db.query(Friends)
-            .filter(Friends.user_id == user_id, Friends.friend_id == friend_id)
-            .first()
-        )
 
         # remove the friend
         try:
