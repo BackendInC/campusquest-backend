@@ -1,5 +1,7 @@
 import bcrypt
 import random
+from db import models, get_db
+from sqlalchemy.orm import Session
 
 SALT = b"$2b$12$oWEEctwkZY/CUopCVaM92O"
 
@@ -24,4 +26,10 @@ def get_random_string(length: int) -> str:
         random.choices(
             "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789", k=length
         )
+    )
+
+
+def get_user_quest_from(user_id: int, quest_id: int, db: Session = Depends(get_db)):
+    return (
+        db.query(models.UserQuests).filter(user_id=user_id, quest_id=quest_id).first()
     )
