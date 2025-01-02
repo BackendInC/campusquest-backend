@@ -149,12 +149,17 @@ def read_user_posts(
     # get all posts by a user
     posts = db.query(models.Posts).filter(models.Posts.user_id == user_id).all()
 
-    # decode the image as base64
-    for post in posts:
-        if post.image:
-            post.image = base64.b64encode(post.image).decode("utf-8")
-
-    return posts
+    return [
+        schemas.PostResponse(
+            id=post.id,
+            user_id=post.user_id,
+            caption=post.caption,
+            created_at=post.created_at,
+            image_url=f"/posts/image/{post.id}",
+            quest_id=post.user_quest_id,
+        )
+        for post in posts
+    ]
 
 
 # update a post by id
