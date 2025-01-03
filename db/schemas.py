@@ -129,27 +129,6 @@ class PostLikeResponse(PostLikeBase):
     message: Optional[str] = None
 
 
-class PostCommentBase(BaseModel):
-    user_id: int
-    post_id: int
-    content: str
-    created_at: datetime
-
-    class Config:
-        orm_mode = True
-
-
-class PostCommentCreate(BaseModel):
-    content: str
-
-    class Config:
-        orm_mode = True
-
-
-class PostCommentResponse(PostCommentBase):
-    id: int  # autoincrement id
-
-
 class EmailVerificationInput(BaseModel):
     username: str
     code: int
