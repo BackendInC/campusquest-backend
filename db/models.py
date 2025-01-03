@@ -162,6 +162,10 @@ class Posts(Base):
     reactions = relationship("PostReactions", back_populates="post", cascade="all, delete-orphan")
     user_quest = relationship("UserQuests", back_populates="post")
 
+    __table_args__ = (
+        UniqueConstraint('user_quest_id', 'user_id', name='_user_quest_user_post_uc'),
+    )
+
 
     def __repr__(self):
         return (
