@@ -206,22 +206,6 @@ class PostLikes(Base):
         )
 
 
-class PostComments(Base):
-    __tablename__ = "post_comments"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content = Column(String(500), nullable=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
-
-    def __repr__(self):
-        return (
-            f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"content={self.content}, created_at={self.created_at})>"
-        )
-
-
 class EmailVerificationCode(Base):
     __tablename__ = "verfication_codes"
     code = Column(Integer, nullable=False)
