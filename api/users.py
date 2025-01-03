@@ -82,6 +82,18 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     }
 
 
+@router.get("/user_info")
+def get_profile(
+    db: session = Depends(get_db), current_user: int = Depends(auth.decode_jwt)
+):
+    user: models.User = (
+        db.query(models.User).filter(models.User.id == current_user).first()
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id, "username": user.username, "email": user.email}
+
+
 @router.post("/users/profile_picture/upload", status_code=200)
 async def upload_profile_picture(
     profile_picture: UploadFile = File(...),
