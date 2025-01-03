@@ -3,6 +3,8 @@ from random import randint
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from io import BytesIO
+from PIL import Image
 
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
@@ -28,6 +30,9 @@ import base64
 import api.utils as utils
 import db.schemas as schemas
 
+MAX_FILE_SIZE = 5 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png"]
+
 
 class User(Base):
     __tablename__ = "users"
@@ -48,6 +53,9 @@ class User(Base):
     selected_bee: int = Column(Integer, nullable=False, default=0)
 
     is_email_verified = Column(Boolean, nullable=False, default=False)
+
+    # Relationships
+    posts = relationship("Posts", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return (
@@ -129,10 +137,9 @@ class Quests(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=False)
-
+    image = Column(LargeBinary, nullable=True)  # put base64 encoded image here
     location_long = Column(Float, nullable=True)
     location_lat = Column(Float, nullable=True)
-    image = Column(LargeBinary, nullable=True)  # put base64 encoded image here
     points = Column(Integer, nullable=False)  # Points awarded for completing the quest
     start_date = Column(Date, nullable=False, default=datetime.now(timezone.utc))
     end_date = Column(DateTime, nullable=True)
@@ -159,7 +166,6 @@ class Posts(Base):
 
 
     user = relationship("User", back_populates="posts")
-    reactions = relationship("PostReactions", back_populates="post", cascade="all, delete-orphan")
     user_quest = relationship("UserQuests", back_populates="post")
 
     __table_args__ = (
@@ -194,6 +200,98 @@ class Posts(Base):
             raise HTTPException(
                 status_code=400, detail=f"Failed to create post: {str(e)}"
             )
+    
+    def check_posted(user_id, quest_id, db):
+        user_quest_id = (
+            db.query(UserQuests.id)
+            .filter(
+                UserQuests.user_id == user_id,
+                UserQuests.quest_id == quest_id,
+            )
+            .first()
+        )
+
+        if user_quest_id is None:
+            return False
+        
+        post = (
+            db.query(Posts)
+            .filter(
+                Posts.user_quest_id == user_quest_id,
+            )
+            .first()
+        )
+
+        if post is None:
+            return False
+        
+        return True
+    
+    @staticmethod
+    async def upload_image(image: UploadFile = File(...)):
+        #validate image type
+        if image.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400, detail="Only JPEG and PNG images are allowed"
+            )
+        
+        #read the raw file contents
+        contents = await image.read()
+
+        #validate file size
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File size too large")        
+
+        # Try to open the image using Pillow
+        try:
+            image = Image.open(BytesIO(contents))
+            if image.format not in ["JPEG", "PNG"]:
+                raise HTTPException(status_code=400, detail="Invalid file format")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+        
+        # Convert RGBA to RGB
+        if image.mode == "RGBA":
+            image = image.convert("RGB")
+
+        #convert and encode as JPEG for consistency
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=85)
+        buffer.seek(0)
+        image_data = buffer.getvalue()
+
+        return image_data
+    
+    @staticmethod
+    def create_post_transcation(user_id, quest_id, caption, image_data, db):
+        try:
+            #create a new user quest and flush to get the id
+            new_user_quest = UserQuests(
+                user_id=user_id,
+                quest_id=quest_id,
+                is_done=True,
+            )
+
+            db.add(new_user_quest)
+            db.flush()
+
+            #create a new post
+            new_post = Posts(
+                user_id=user_id,
+                caption=caption,
+                image=image_data,
+                user_quest_id=new_user_quest.id,
+            )
+
+            db.add(new_post)
+            db.commit()
+            db.refresh(new_post)
+
+            return new_post
+        
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Failed to create post: {str(e)}")
 
 
 class PostLikes(Base):
