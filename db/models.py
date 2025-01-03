@@ -417,8 +417,10 @@ class Friends(Base):
             )
 
         new_friend = Friends(user_id=user_id, friend_id=friend_id)
+        new_friend_2 = Friends(user_id=friend_id, friend_id=user_id)
         try:
             db.add(new_friend)
+            db.add(new_friend_2)
             db.commit()
             db.refresh(new_friend)
             return new_friend
