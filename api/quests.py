@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from datetime import datetime, timezone
 import db.models as models
 import api.auth as auth
+from api.achievements_service import AchievementService
 
 router = APIRouter()
 
@@ -11,9 +12,8 @@ router = APIRouter()
 @router.get("/quests", response_model=list[schemas.QuestRead])
 def read_quests(db: Session = Depends(get_db)):
     # Get all achievements from the database
-    achievements = db.query(models.Quests).all()
-    print(achievements)
-    return achievements
+    quests = db.query(models.Quests).all()
+    return quests
 
 
 @router.get("/quests/{quest_id}", response_model=schemas.QuestRead)
@@ -196,7 +196,11 @@ def read_logged_in_user_quests(
     return results
 
 
-@router.post("/quests/start/{quest_id}", status_code=200, response_model=schemas.UserQuestsResponse)
+@router.post(
+    "/quests/start/{quest_id}",
+    status_code=200,
+    response_model=schemas.UserQuestsResponse,
+)
 def create_user_quest(
     quest_id: int,
     db: Session = Depends(get_db),
@@ -227,6 +231,7 @@ def create_user_quest(
 
     return new_user_quest
 
+
 @router.put("/quests/complete/{quest_id}")
 def complete_user_quest(
     quest_id: int,
@@ -256,7 +261,8 @@ def complete_user_quest(
     user_quest.is_done = True
     db.commit()
 
-    return {"message": "Quest completed successfully"}
+    new_achievements = AchievementService.check_achievements(user_id, db)
+    return {"message": "Quest completed", "new_achievements": new_achievements}
 
 
 @router.post("/quest/verify/{quest_id}/{user_id}")
@@ -332,7 +338,9 @@ def verify_quest(
         user_quest.is_verified = True
         db.commit()
 
+    new_achievements = AchievementService.check_achievements(user_id, db)
     return {
         "message": "Verification successful",
         "total_verifications": verification_count,
+        "new_achievements": new_achievements,
     }

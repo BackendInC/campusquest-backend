@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import session
 from db import get_db, schemas, models
-import api.utils as utils
 import api.auth as auth
+from api.achievements_service import AchievementService
 
 router = APIRouter()
 
@@ -15,7 +15,10 @@ def add_friend(
     user_id: int = Depends(auth.decode_jwt),
 ):
     # create a new friend instance
-    return models.Friends.create_friend(user_id, friend_id, db)
+    response = models.Friends.create_friend(user_id, friend_id, db)
+    new_achievements = AchievementService.check_achievements(user_id, db)
+    response["new_achievements"] = new_achievements
+    return response
 
 
 # remove a friend

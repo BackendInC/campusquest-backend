@@ -6,6 +6,7 @@ import base64
 from io import BytesIO
 from PIL import Image
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
+from api.achievements_service import AchievementService
 
 router = APIRouter()  # create an instance of the APIRouter class
 
@@ -293,6 +294,9 @@ def toggle_like(
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to like post: {str(e)}")
+
+    new_achievements = AchievementService.check_achievements(current_user, db)
+    return {"new_achievements": new_achievements}
 
 
 # display all likes for a post
