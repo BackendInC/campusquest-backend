@@ -107,6 +107,17 @@ class Achievements(Base):
         return f"<Achievements(id={self.id}, description={self.description}, award_tokens={self.award_tokens})>"
         return f"<Achievements(id={self.id}, description={self.description}, award_tokens={self.award_tokens})>"
 
+    @staticmethod
+    def load_achievements(milestones: dict, db: Session):
+        for milestone, achievement in milestones.items():
+            new_achievement = Achievements(
+                id=achievement["id"],
+                description=achievement["description"],
+                award_tokens=achievement["award_tokens"],
+            )
+            db.add(new_achievement)
+            db.commit()
+
 
 class UserAchievements(Base):
     __tablename__ = "user_achievements"
