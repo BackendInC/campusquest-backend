@@ -147,7 +147,6 @@ class Quests(Base):
             f"date_due={self.end_date}"
         )
 
-
 class Posts(Base):
     __tablename__ = "posts"
 
@@ -158,12 +157,16 @@ class Posts(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     user_quest_id = Column(Integer, ForeignKey("user_quests.id"), nullable=False)
 
+
+    user = relationship("User", back_populates="posts")
+    reactions = relationship("PostReactions", back_populates="post", cascade="all, delete-orphan")
     user_quest = relationship("UserQuests", back_populates="post")
+
 
     def __repr__(self):
         return (
             f"<Posts(id={self.id}, caption={self.caption}, user_id={self.user_id}, "
-            f"created_at={self.created_at})>"
+            f"created_at={self.created_at}, user_quest_id={self.user_quest_id})>"
         )
 
     @staticmethod
