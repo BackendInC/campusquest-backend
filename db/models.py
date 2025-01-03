@@ -9,6 +9,7 @@ from sqlalchemy import (
     LargeBinary,
     ForeignKey,
     UniqueConstraint,
+    CheckConstraint,
     Float,
     Enum,
     Response,
@@ -199,23 +200,30 @@ class Friends(Base):
     friend = relationship("User", foreign_keys=[friend_id])
 
     # Ensure that a user cannot be friends with the same user twice
-    __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),
+        CheckConstraint("user_id < friend_id", name="_user_not_friend"),
+        CheckConstraint("user_id != friend_id", name="_user_not_self"),
+    )
 
     def __repr__(self):
         return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
     
     @staticmethod
     def are_friends(user_id, friend_id, db) -> bool:
+        if user_id == friend_id:
+            return False
+        
+        user, friend = sorted([user_id, friend_id])
         # Check if the users are already friends
-        return db.query(Friends).filter(
-            or_(
-                and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
-                and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
-            )
-        ).first() is not None
+        return db.query(Friends).filter(Friends.user_id == user, Friends.friend_id == friend).first() is not None
+
     
     @staticmethod
     def create_friend(user_id, friend_id, db) -> "Friends":
+        #check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
         #check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
 
@@ -256,7 +264,7 @@ class Friends(Base):
         #check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
 
-        if not (friend_user or user):
+        if not (friend_user and user):
             raise HTTPException(status_code=404, detail="Friend not found")
         
         #prevent removing yourself as a friend
@@ -272,6 +280,7 @@ class Friends(Base):
         try:
             db.delete(friend)
             db.commit()
+            return None
         
         except HTTPException as e:
             db.rollback()
@@ -287,20 +296,27 @@ class Friends(Base):
             raise HTTPException(status_code=404, detail="User not found")
 
         # Get all friends with additional details
-        friends = (
-            db.query(User.id, User.username, User.profile_picture)
-            .join(Friends, Friends.friend_id == User.id)
-            .filter(Friends.user_id == user_id)
-            .all()
-        )
+        friends = db.query(Friends).filter(
+            (Friends.user_id == user_id) | (Friends.friend_id == user_id)
+        ).all()
 
-            # Process friends to include binary profile picture
-        processed_friends = []
+        # Process friends to include binary profile picture
+        friends_details = []
         for friend in friends:
-            if friend.profile_picture:
+            if friend.user_id == user_id:
+                id =  friend.friend.id
+                username = friend.friend.username
+                profile_picture = friend.friend.profile_picture
+            else:
+                id = friend.user.id
+                username = friend.user.username
+                profile_picture = friend.user.profile_picture
+                
+            if profile_picture:
                 try:
                     # Decode binary data to an image
-                    image = Image.open(BytesIO(friend.profile_picture))
+                    image = Image.open(BytesIO(profile_picture))
+
                     # Encode the image as JPEG
                     buffer = BytesIO()
                     image.save(buffer, format="JPEG")
@@ -311,31 +327,44 @@ class Friends(Base):
             else:
                 profile_picture_binary = None
 
-        # Append the processed friend data
-        processed_friends.append({
-            "id": friend.id,
-            "username": friend.username,
-            "profile_picture": Response(content=profile_picture_binary, media_type="image/jpeg") if profile_picture_binary else None
-        })
+            # Append the processed friend data
+            friends_details.append({
+                "id": id,
+                "username": username,
+                "profile_picture": Response(content=profile_picture_binary, media_type="image/jpeg") if profile_picture_binary else None
+            })
 
-        return processed_friends
+        return friends_details
 
     
-    @staticmethod
-    def get_mutual_friends(user_id, friend_id, db):
-        #check if the user is a user
-        user = db.query(User).filter(User.id == user_id).first()
+@staticmethod
+def get_mutual_friends(user_id, friend_id, db):
+    # Check if both users exist
+    users_exist = db.query(User.id).filter(User.id.in_([user_id, friend_id])).count()
+    if users_exist < 2:
+        raise HTTPException(status_code=404, detail="One or both users not found")
 
-        #check if the friend is a user
-        friend_user = db.query(User).filter(User.id == friend_id).first()
+    # Get friend IDs for the first user
+    user_friend_ids = db.query(Friends.user_id, Friends.friend_id).filter(
+        (Friends.user_id == user_id) | (Friends.friend_id == user_id)
+    ).all()
+    user_friend_ids = {
+        friend_id if friend_id != user_id else user_id for user_id, friend_id in user_friend_ids
+    }
 
-        if not (friend_user or user):
-            raise HTTPException(status_code=404, detail="Friend not found")
-        
-        #get all friends of the user
-        user_friends = db.query(Friends).filter(Friends.user_id == user_id).all()
-        friend_friends = db.query(Friends).filter(Friends.user_id == friend_id).all()
+    # Get friend IDs for the second user
+    friend_friend_ids = db.query(Friends.user_id, Friends.friend_id).filter(
+        (Friends.user_id == friend_id) | (Friends.friend_id == friend_id)
+    ).all()
+    friend_friend_ids = {
+        friend_id if friend_id != user_id else user_id for user_id, friend_id in friend_friend_ids
+    }
 
-        #get mutual friends
-        mutual_friends = [friend for friend in user_friends if friend in friend_friends]
-        return mutual_friends
+    # Get mutual friend IDs
+    mutual_friend_ids = user_friend_ids.intersection(friend_friend_ids)
+
+    # Fetch mutual friend details
+    mutual_friends = db.query(User).filter(User.id.in_(mutual_friend_ids)).all()
+
+    # Return mutual friends as a list of dictionaries
+    return [{"id": mf.id, "username": mf.username} for mf in mutual_friends]
