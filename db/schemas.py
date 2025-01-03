@@ -45,6 +45,7 @@ class ProfileInfoResponse(BaseModel):
     num_quests_completed: int
     num_friends: int
     post_ids: List[int]
+    selected_bee: int
 
     class Config:
         orm_mode = True

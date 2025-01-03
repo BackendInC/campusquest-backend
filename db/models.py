@@ -45,6 +45,8 @@ class User(Base):
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
 
+    selected_bee: int = Column(Integer, nullable=False, default=0)
+
     is_email_verified = Column(Boolean, nullable=False, default=False)
 
     def __repr__(self):
