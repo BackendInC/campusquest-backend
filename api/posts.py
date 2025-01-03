@@ -14,6 +14,16 @@ MAX_FILE_SIZE = 5 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png"]
 
 
+def get_quest_id_from_user_quest_id(user_quest_id: int, db: Session):
+    # get user quest object
+    user_quest = (
+        db.query(models.UserQuests)
+        .filter(models.UserQuests.id == user_quest_id)
+        .first()
+    )
+    return user_quest.quest_id
+
+
 @router.post("/posts", response_model=schemas.PostResponse)
 def create_post(
     caption: str = Form(...),
@@ -95,7 +105,7 @@ def create_post(
             caption=new_post.caption,
             created_at=new_post.created_at,
             image_url=f"/posts/image/{new_post.id}",
-            quest_id=new_post.user_quest_id,
+            quest_id=quest_id,
         )
 
     except Exception as e:
@@ -156,7 +166,7 @@ def read_user_posts(
             caption=post.caption,
             created_at=post.created_at,
             image_url=f"/posts/image/{post.id}",
-            quest_id=post.user_quest_id,
+            quest_id=get_quest_id_from_user_quest_id(post.user_quest_id, db),
         )
         for post in posts
     ]

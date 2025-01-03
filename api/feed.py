@@ -9,6 +9,16 @@ import api.auth as auth
 router = APIRouter()
 
 
+def get_quest_id_from_user_quest_id(user_quest_id: int, db: Session):
+    # get user quest object
+    user_quest = (
+        db.query(models.UserQuests)
+        .filter(models.UserQuests.id == user_quest_id)
+        .first()
+    )
+    return user_quest.quest_id
+
+
 # read all posts no need for authentication since all users can see all posts
 @router.get("/feed", response_model=list[schemas.PostResponse])
 def read_posts(db: Session = Depends(get_db)):
@@ -23,7 +33,7 @@ def read_posts(db: Session = Depends(get_db)):
                 caption=post.caption,
                 created_at=post.created_at,
                 image_url=f"/posts/image/{post.id}",
-                quest_id=post.user_quest_id,
+                quest_id=get_quest_id_from_user_quest_id(post.user_quest_id, db),
             )
         )
 
@@ -64,7 +74,7 @@ def read_friends_posts(
                     caption=post.caption,
                     created_at=post.created_at,
                     image_url=f"/posts/image/{post.id}",
-                    quest_id=post.user_quest_id,
+                    quest_id=get_quest_id_from_user_quest_id(post.user_quest_id, db),
                 )
             )
 
