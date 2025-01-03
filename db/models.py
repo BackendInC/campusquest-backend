@@ -158,7 +158,7 @@ class Posts(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     user_quest_id = Column(Integer, ForeignKey("user_quests.id"), nullable=False)
 
-    user_quest = relationship("UserQuests", back_populates="posts", cascade="all, delete-orphan")
+    user_quest = relationship("UserQuests", back_populates="post")
 
     def __repr__(self):
         return (
@@ -334,7 +334,6 @@ class UserQuests(Base):
     is_done = Column(Boolean, default=False, nullable=False)
     date_completed = Column(DateTime, default=datetime.now(timezone.utc))
     is_verified = Column(Boolean, default=False, nullable=False)
-    post_id = Column(Integer, ForeignKey("posts.id"), nullable=True)
 
     post = relationship("Posts", back_populates="user_quest", cascade="all, delete-orphan")
 

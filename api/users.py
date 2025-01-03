@@ -36,7 +36,7 @@ def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
             )
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=e)
+            raise HTTPException(status_code=500, detail=str(e))
         db.commit()
         db.refresh(new_user)
         return new_user
