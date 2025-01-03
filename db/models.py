@@ -11,7 +11,6 @@ from sqlalchemy import (
     UniqueConstraint,
     CheckConstraint,
     Float,
-    Enum,
     or_,
     and_,
 )
@@ -22,6 +21,8 @@ from fastapi import HTTPException, Response
 import enum
 from io import BytesIO
 from PIL import Image
+from sqlalchemy.dialects.postgresql import ENUM
+
 
 
 
@@ -41,8 +42,7 @@ class User(Base):
     tokens = Column(Integer, default=0)
 
     posts = relationship("Posts", back_populates="user")
-    likes = relationship("PostLikes", back_populates="user")
-    comments = relationship("PostComments", back_populates="user")
+    reactions = relationship("PostReactions", back_populates="user")
 
     # relationships
     quests = relationship("UserQuests", back_populates="user")
@@ -129,11 +129,8 @@ class Posts(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     user = relationship("User", back_populates="posts")
-    likes = relationship(
-        "PostLikes", back_populates="post", cascade="all, delete-orphan"
-    )
-    comments = relationship(
-        "PostComments", back_populates="post", cascade="all, delete-orphan"
+    reactions = relationship(
+        "PostReactions", back_populates="post", cascade="all, delete-orphan"
     )
 
     def __repr__(self):
@@ -144,9 +141,10 @@ class Posts(Base):
 
 
 class ReactionType(enum.Enum):
-    LIKE = "like"
-    DISLIKE = "dislike"
+    LIKE = "LIKE"
+    DISLIKE = "DISLIKE"
 
+reaction_type_enum = ENUM(ReactionType, name="reactiontype", create_type=False)
 
 class PostReactions(Base):
     __tablename__ = "post_reactions"
@@ -154,17 +152,17 @@ class PostReactions(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reaction_type = Column(Enum(ReactionType), nullable=False)
+    reaction_type = Column(reaction_type_enum,nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
 
-    post = relationship("Posts", back_populates="likes")
-    user = relationship("User", back_populates="likes")
+    post = relationship("Posts", back_populates="reactions")
+    user = relationship("User", back_populates="reactions")
 
     def __repr__(self):
         return (
-            f"<PostLikes(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
+            f"<PostReactions(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
             f"reaction_type={self.reaction_type}, created_at={self.created_at})>"
         )
 

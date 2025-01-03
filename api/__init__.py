@@ -8,11 +8,16 @@ import db.schemas as schemas
 from api.achievements import router as achievementsRouter
 from api.users import router as usersRouter
 from api.quests import router as questsRouter
+from api.posts import router as postsRouter
+from api.friends import router as friendsRouter
 
 app = FastAPI()
 app.include_router(achievementsRouter)
 app.include_router(usersRouter)
 app.include_router(questsRouter)
+app.include_router(postsRouter)
+app.include_router(friendsRouter)
+
 
 
 def start_app():

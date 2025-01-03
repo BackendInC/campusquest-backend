@@ -70,9 +70,15 @@ class UserAchievementResponse(UserAchievementBase):
     id: int
 
 
-class PostBase(BaseModel):
+class PostCreate(BaseModel):
+    caption: str
+
+    class Config:
+        orm_mode = True
+
+class PostCreateResponse(BaseModel):
+    id: int
     user_id: int
-    image: bytes
     caption: str
     created_at: datetime
 
@@ -80,15 +86,7 @@ class PostBase(BaseModel):
         orm_mode = True
 
 
-class PostCreate(BaseModel):
-    user_id: int
-    caption: str
-
-    class Config:
-        orm_mode = True
-
-
-class PostResponse(PostBase):
+class PostResponse(BaseModel):
     id: int  # autoincrement id
     user_id: int
     caption: str
@@ -126,6 +124,9 @@ class PostReactionCreate(BaseModel):
 class PostReactionResponse(PostReactionBase):
     id: int  # autoincrement id
     message: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 class QuestBase(BaseModel):
     name: str
