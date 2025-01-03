@@ -43,7 +43,7 @@ def create_post(
 
 
 #upload an image for the post
-@router.post("/posts/{post_id}/image", status_code=200)
+@router.post("/posts/image/{post_id}", status_code=200)
 async def upload_image(
     post_id: int,
     image: UploadFile = File(...),
@@ -87,8 +87,8 @@ async def upload_image(
         )
     
 
-#get post image
-@router.get("/posts/{post_id}/image", status_code=200)
+#get post image (edit all apis to this structure)
+@router.get("/posts/image/{post_id}}", status_code=200)
 async def get_image(post_id: int, db: Session = Depends(get_db)):
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
     if not post:
@@ -178,7 +178,7 @@ def read_post(post_id: int, db: Session = Depends(get_db)):
     }
 
 # read all posts information by a user
-@router.get("/users/{user_id}/posts", response_model=list[schemas.PostResponse])
+@router.get("/users/posts/{user_id}", response_model=list[schemas.PostResponse])
 def read_user_posts(
     user_id: int, 
     db: Session = Depends(get_db), 
@@ -285,7 +285,7 @@ def delete_post(
 
 
 # like and unlike a post
-@router.post("/posts/{post_id}/like", response_model=schemas.PostReactionResponse)
+@router.post("/posts/like/{post_id}", response_model=schemas.PostReactionResponse)
 def toggle_like(
     post_id: int,
     db: Session = Depends(get_db),
@@ -343,7 +343,7 @@ def toggle_like(
         raise HTTPException(status_code=400, detail=f"Failed to like post: {str(e)}")
 
 # dislike and remove dislike
-@router.post("/posts/{post_id}/dislike", response_model=schemas.PostLikeResponse)
+@router.post("/posts/dislike/{post_id}", response_model=schemas.PostLikeResponse)
 def toggle_dislike(
     post_id: int,
     db: Session = Depends(get_db),
@@ -401,7 +401,7 @@ def toggle_dislike(
         raise HTTPException(status_code=400, detail=f"Failed to like post: {str(e)}")
     
 # display all likes for a post
-@router.get("/posts/{post_id}/likes", response_model=list[schemas.PostReactionResponse])
+@router.get("/posts/likes/{post_id}", response_model=list[schemas.PostReactionResponse])
 def read_post_likes(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -416,7 +416,7 @@ def read_post_likes(post_id: int, db: Session = Depends(get_db)):
     return likes
 
 # display all dislikes for a post
-@router.get("/posts/{post_id}/dislikes", response_model=list[schemas.PostReactionResponse])
+@router.get("/posts/dislikes/{post_id}", response_model=list[schemas.PostReactionResponse])
 def read_post_dislikes(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -432,7 +432,7 @@ def read_post_dislikes(post_id: int, db: Session = Depends(get_db)):
 
 
 # count the number of likes for a post
-@router.get("/posts/{post_id}/likes/count", response_model=int)
+@router.get("/posts/likes/count/{post_id}", response_model=int)
 def count_post_likes(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -449,7 +449,7 @@ def count_post_likes(post_id: int, db: Session = Depends(get_db)):
     return count
 
 # count the number of dislikes for a post
-@router.get("/posts/{post_id}/dislikes/count", response_model=int)
+@router.get("/posts/dislikes/count/{post_id}", response_model=int)
 def count_post_dislikes(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -468,7 +468,7 @@ def count_post_dislikes(post_id: int, db: Session = Depends(get_db)):
 
 
 # check if a user has liked a post
-@router.get("/posts/{post_id}/like", response_model=bool)
+@router.get("/posts/like/{post_id}", response_model=bool)
 def check_user_like(
     post_id: int,
     db: Session = Depends(get_db),
@@ -494,7 +494,7 @@ def check_user_like(
     return False
 
 # check if a user has disliked a post
-@router.get("/posts/{post_id}/dislike", response_model=bool)
+@router.get("/posts/dislike/{post_id}", response_model=bool)
 def check_user_dislike(
     post_id: int,
     db: Session = Depends(get_db),
@@ -521,7 +521,7 @@ def check_user_dislike(
 
 
 # read all users who liked a post
-@router.get("/posts/{post_id}/likedby", response_model=list[schemas.UserResponse])
+@router.get("/posts/likedby/{post_id}", response_model=list[schemas.UserResponse])
 def read_post_likedby(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
@@ -541,7 +541,7 @@ def read_post_likedby(post_id: int, db: Session = Depends(get_db)):
    
 
 # read all users who disliked a post
-@router.get("/posts/{post_id}/dislikedby", response_model=list[schemas.UserResponse])
+@router.get("/posts/dislikedby/{post_id}", response_model=list[schemas.UserResponse])
 def read_post_dislikedby(post_id: int, db: Session = Depends(get_db)):
     # check if post exists
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
