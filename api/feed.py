@@ -31,7 +31,7 @@ def read_posts(db: Session = Depends(get_db)):
 
 
 # get the posts by friends
-@router.get("/feed/friends", response_model=schemas.PostResponse)
+@router.get("/feed/friends", response_model=list[schemas.PostResponse])
 def read_friends_posts(
     db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)
 ):
