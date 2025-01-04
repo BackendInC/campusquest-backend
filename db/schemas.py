@@ -223,15 +223,35 @@ class QuestVerification(BaseModel):
 
 
 class FriendBase(BaseModel):
-    user_id: int
     friend_id: int
+    user_id: int
 
     class Config:
         orm_mode = True
 
+class FriendCreate(BaseModel):
+    friend_id: int
 
-class FriendResponse(FriendBase):
+    class Config:
+        orm_mode = True
+        
+class FriendCreateResponse(FriendBase):
+    id: int
+    message: str
+
+
+class FriendResponse(BaseModel):
     id: int  # autoincrement id
+    friend_id: int
+    username: str
+    profile_picture_url: str
+
+    class Config:
+        orm_mode = True
+
+class MutualFriendResponse(BaseModel):
+    friend_id: int
+    username: str
 
     class Config:
         orm_mode = True
