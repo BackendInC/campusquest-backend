@@ -108,7 +108,6 @@ def read_post(
 async def get_image(
     post_id: int,
     db: Session = Depends(get_db),
-    current_user: int = Depends(auth.decode_jwt),
 ):
     post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
     if not post:
