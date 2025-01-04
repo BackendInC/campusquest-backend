@@ -56,35 +56,68 @@ async def create_post(
         raise HTTPException(status_code=400, detail=f"Failed to create post: {str(e)}")
 
 
-# read all posts
+#read all posts information
 @router.get("/posts", response_model=list[schemas.PostResponse])
-def read_posts(db: Session = Depends(get_db)):
-    # get all posts from the database
-    posts = db.query(models.Posts).all()
+def read_posts(db: Session = Depends(get_db), current_user: int = Depends(auth.decode_jwt)):
 
-    # decode the image as base64
-    for post in posts:
-        if post.image:
-            post.image = base64.b64encode(post.image).decode("utf-8")
+    # Get all posts
+    posts = models.Posts.get_all_posts(db)
 
-    return posts
+    # Map query results to response model
+    return [
+        schemas.PostResponse(
+            id=post.id,
+            user_id=post.user_id,
+            caption=post.caption,
+            likes_count=post.likes_count,
+            dislikes_count=post.dislikes_count,
+            created_at=post.created_at,
+            image_url=f"/posts/image/{post.id}",
+        )
+        for post in posts
+    ]
 
 
-# read a post by id
+#read post information by post_id
 @router.get("/posts/{post_id}", response_model=schemas.PostResponse)
-def read_post(post_id: int, db: Session = Depends(get_db)):
-    # get the post by id
-    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
+def read_post(post_id: int, db: Session = Depends(get_db), current_user: int = Depends(auth.decode_jwt)):
 
-    # check if post exists
+    # Get the post by ID
+    post, likes_count, dislikes_count = models.Posts.get_post_by_id(post_id, db)
+
+    # Return the response
+    return {
+        "id": post.id,
+        "user_id": post.user_id,
+        "caption": post.caption,
+        "likes_count": likes_count,
+        "dislikes_count": dislikes_count,
+        "created_at": post.created_at,
+        "image_url": f"/posts/image/{post.id}",
+    }
+
+#get post image
+@router.get("/posts/image/{post_id}", status_code=200)
+async def get_image(post_id: int, db: Session = Depends(get_db), current_user: int = Depends(auth.decode_jwt)):
+    post = db.query(models.Posts).filter(models.Posts.id == post_id).first()
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
 
-    # decode the image as base64
-    if post.image:
-        post.image = base64.b64encode(post.image).decode("utf-8")
+    if not post.image:
+        raise HTTPException(status_code=404, detail="Image not found")
+    
+    try:
+        image = Image.open(BytesIO(post.image))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to get image: {e}")
+    
 
-    return post
+    #encode the image as JPEG
+    buffer = BytesIO()
+    image.save(buffer, format="JPEG")
+    buffer.seek(0)
+
+    return Response(content=buffer.getvalue(), media_type="image/jpeg")
 
 
 # read all posts by a user

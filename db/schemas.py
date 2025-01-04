@@ -79,6 +79,7 @@ class PostBase(BaseModel):
     user_id: int
     caption: str
     created_at: datetime
+    image_url: str
 
     class Config:
         orm_mode = True
@@ -91,14 +92,17 @@ class PostCreate(BaseModel):
     class Config:
         orm_mode = True
 
-
-class PostResponse(BaseModel):
+class PostCreateResponse(PostBase):
     id: int  # autoincrement id
-    user_id: int
-    caption: str
-    created_at: datetime
-    image_url: str
     quest_id: int
+
+class PostResponse(PostBase):
+    id: int  # autoincrement id
+    likes_count: int
+    dislikes_count: int
+
+    class Config:
+        orm_mode = True
 
 
 class PostUpdate(BaseModel):

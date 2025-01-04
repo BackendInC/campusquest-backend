@@ -5,6 +5,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
 from PIL import Image
+from sqlalchemy import func, case
+from sqlalchemy.dialects.postgresql import ENUM
+import enum
 
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
@@ -56,6 +59,7 @@ class User(Base):
 
     # Relationships
     posts = relationship("Posts", back_populates="user", cascade="all, delete-orphan")
+    reactions = relationship("PostReactions", back_populates="user", cascade="all, delete-orphan")
 
     def __repr__(self):
         return (
@@ -167,6 +171,7 @@ class Posts(Base):
 
     user = relationship("User", back_populates="posts")
     user_quest = relationship("UserQuests", back_populates="post")
+    reactions = relationship("PostReactions", back_populates="post", cascade="all, delete-orphan")
 
     __table_args__ = (
         UniqueConstraint('user_quest_id', 'user_id', name='_user_quest_user_post_uc'),
@@ -292,22 +297,76 @@ class Posts(Base):
         except Exception as e:
             db.rollback()
             raise HTTPException(status_code=500, detail=f"Failed to create post: {str(e)}")
+        
+    @staticmethod
+    def get_all_posts(db):
+        posts = (
+            db.query(
+                Posts.id,
+                Posts.user_id,
+                Posts.caption,
+                Posts.created_at,
+                func.count(
+                    case((PostReactions.reaction_type == "LIKE", 1))
+                ).label("likes_count"),
+                func.count(
+                    case((PostReactions.reaction_type == "DISLIKE", 1))
+                ).label("dislikes_count"),
+            )
+            .outerjoin(PostReactions, PostReactions.post_id == Posts.id)
+            .group_by(Posts.id)
+            .all()
+        )
+
+        return posts
+    
+    @staticmethod
+    def get_post_by_id(post_id, db):
+        # Get the post by ID
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+
+        # Check if post exists
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # Count likes and dislikes for the post
+        likes_count = db.query(func.count(PostReactions.id)).filter(
+            PostReactions.post_id == post.id,
+            PostReactions.reaction_type == "LIKE"
+        ).scalar()
+
+        dislikes_count = db.query(func.count(PostReactions.id)).filter(
+            PostReactions.post_id == post.id,
+            PostReactions.reaction_type == "DISLIKE"
+        ).scalar()
+
+        return post, likes_count, dislikes_count
 
 
-class PostLikes(Base):
-    __tablename__ = "post_likes"
+class ReactionType(enum.Enum):
+    LIKE = "LIKE"
+    DISLIKE = "DISLIKE"
+
+reaction_type_enum = ENUM(ReactionType, name="reactiontype")
+
+class PostReactions(Base):
+    __tablename__ = "post_reactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reaction_type = Column(ENUM(ReactionType, name="reactiontype", create_type=False),nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
 
+    post = relationship("Posts", back_populates="reactions")
+    user = relationship("User", back_populates="reactions")
+
     def __repr__(self):
         return (
-            f"<PostLikes(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"created_at={self.created_at})>"
+            f"<PostReactions(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
+            f"reaction_type={self.reaction_type}, created_at={self.created_at})>"
         )
 
 
