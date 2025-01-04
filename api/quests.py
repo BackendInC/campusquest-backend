@@ -6,7 +6,7 @@ import db.models as models
 import api.auth as auth
 from api.achievements_service import AchievementService
 
-router = APIRouter()
+router = APIRouter(tags=["quests"])
 
 
 @router.get("/quests", response_model=list[schemas.QuestRead])

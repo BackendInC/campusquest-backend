@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Respons
 from api.achievements_service import AchievementService
 from sqlalchemy import func, case
 
-router = APIRouter()
+router = APIRouter(tags=["posts"])  # create an instance of the APIRouter class
 
 MAX_FILE_SIZE = 5 * 1024 * 1024
 ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png"]

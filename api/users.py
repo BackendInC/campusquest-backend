@@ -14,7 +14,7 @@ import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=schemas.UserResponse)
@@ -59,6 +59,9 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_email_verified:
         raise HTTPException(status_code=401, detail="User is not verified")
+    if models.BannedUsers.is_banned(user.id, db):
+        raise HTTPException(status_code=403, detail="User is banned")
+
     # check if the password is correct
     hashed_password = utils.hash_password(userRequest.password, user.salt)
     if hashed_password != user.password:

@@ -53,6 +53,7 @@ class User(Base):
     date_of_birth = Column(Date, nullable=True)
     num_quests_completed = Column(Integer, default=0)
     tokens = Column(Integer, default=0)
+    is_email_verified = Column(Boolean, nullable=False, default=False)
 
     selected_bee: int = Column(Integer, nullable=False, default=0)
 
@@ -92,6 +93,53 @@ class User(Base):
     @staticmethod
     def get_user(user_id, db):
         return db.query(User).filter(User.id == user_id).first()
+
+
+class BannedUsers(Base):
+    __tablename__ = "banned_users"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    banned_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    reason = Column(String, nullable=False)
+
+    @staticmethod
+    def ban_user(user_id, reason, db):
+        if BannedUsers.is_banned(user_id, db):
+            raise HTTPException(status_code=400, detail="User is already banned")
+        banned_user = BannedUsers(user_id=user_id, reason=reason)
+        db.add(banned_user)
+        db.commit()
+        db.refresh(banned_user)
+        return banned_user
+
+    @staticmethod
+    def is_banned(user_id, db):
+        return (
+            db.query(BannedUsers).filter(BannedUsers.user_id == user_id).first()
+            is not None
+        )
+
+    def __repr__(self):
+        return (
+            f"<BannedUsers(id={self.id}, user_id={self.user_id}, banned_at={self.banned_at}, "
+            f"reason={self.reason})>"
+        )
+
+
+class Admin(Base):
+    __tablename__ = "admins"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    def __repr__(self):
+        return f"<Admin(id={self.id}, user_id={self.user_id})>"
+
+    @staticmethod
+    def verify_admin(user_id, db):
+        return db.query(Admin).filter(Admin.user_id == user_id).first() is not None
 
 
 class Sessions(Base):
