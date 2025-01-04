@@ -96,14 +96,19 @@ class PostCreateResponse(PostBase):
     id: int  # autoincrement id
     quest_id: int
 
+    class Config:
+        orm_mode = True
+
 class PostResponse(PostBase):
     id: int  # autoincrement id
     likes_count: int
     dislikes_count: int
+    quest_id: int
+    username: str
+    profile_picture_url: str
 
     class Config:
         orm_mode = True
-
 
 class PostUpdate(BaseModel):
     caption: str
@@ -111,8 +116,14 @@ class PostUpdate(BaseModel):
     class Config:
         orm_mode = True
 
+class PostUpdateResponse(PostUpdate):
+    id: int  # autoincrement id
+    user_id: int
 
-class PostLikeBase(BaseModel):
+    class Config:
+        orm_mode = True
+
+class PostReactionBase(BaseModel):
     user_id: int
     post_id: int
 
@@ -120,7 +131,7 @@ class PostLikeBase(BaseModel):
         orm_mode = True
 
 
-class PostLikeCreate(BaseModel):
+class PostReactionCreate(BaseModel):
     user_id: int
     post_id: int
 
@@ -128,9 +139,12 @@ class PostLikeCreate(BaseModel):
         orm_mode = True
 
 
-class PostLikeResponse(PostLikeBase):
+class PostReactionResponse(PostReactionBase):
     id: int  # autoincrement id
     message: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 
 class EmailVerificationInput(BaseModel):
