@@ -177,7 +177,7 @@ def delete_post(
     current_user: int = Depends(auth.decode_jwt),
 ):
     try:
-        response = models.Posts.delete(post_id, current_user, db)
+        response = models.UserQuests.delete(post_id, current_user, db)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to delete post: {str(e)}")

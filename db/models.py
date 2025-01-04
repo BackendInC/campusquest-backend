@@ -406,30 +406,6 @@ class Posts(Base):
                 status_code=400, detail=f"Failed to update post: {str(e)}"
             )
 
-    @staticmethod
-    def delete(post_id, current_user, db):
-        # get the post by id
-        post = db.query(Posts).filter(Posts.id == post_id).first()
-        if not post:
-            raise HTTPException(status_code=404, detail="Post not found")
-
-        # check if the user is the owner of the post
-        if post.user_id != current_user:
-            raise HTTPException(
-                status_code=403, detail="You are not the owner of this post"
-            )
-
-        # delete the post
-        try:
-            db.delete(post)
-            db.commit()
-            return {"detail": "Post deleted successfully"}
-
-        except Exception as e:
-            raise HTTPException(
-                status_code=400, detail=f"Failed to delete post: {str(e)}"
-            )
-
 
 class ReactionType(enum.Enum):
     LIKE = "LIKE"
@@ -724,6 +700,36 @@ class UserQuests(Base):
         # get user quest object
         user_quest = db.query(UserQuests).filter(UserQuests.id == user_quest_id).first()
         return user_quest.quest_id
+    
+    @staticmethod
+    def delete(post_id: int, user_id : int, db: Session):
+        # get the post by id
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # check if the user is the owner of the post
+        if post.user_id != user_id:
+            raise HTTPException(
+                status_code=403, detail="You are not the owner of this post"
+            )
+        
+        # get the user_quest
+        user_quest = db.query(UserQuests).filter(UserQuests.id == post.user_quest_id).first()
+
+        if not user_quest:
+            raise HTTPException(status_code=404, detail="UserQuest not found")
+
+        # delete the post
+        try:
+            db.delete(user_quest)
+            db.commit()
+            return {"detail": "Post and UserQuest deleted successfully"}
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to delete post: {str(e)}"
+            )
 
 
 class QuestVerification(Base):
@@ -806,17 +812,20 @@ class Friends(Base):
             raise HTTPException(
                 status_code=400, detail="Already friends with this user"
             )
+        
+        # sort the user and friend IDs to ensure consistency
+        user_id, friend_id = sorted([user_id, friend_id])
 
         # create a new friend instance
-        new_friend = Friends(user_id=user_id, friend_id=friend_id)
+        new_friendship = Friends(user_id=user_id, friend_id=friend_id)
 
         # add and commit the friend to the database
         try:
-            db.add(new_friend)
+            db.add(new_friendship)
             db.commit()
-            db.refresh(new_friend)
+            db.refresh(new_friendship)
 
-            return new_friend
+            return new_friendship
 
         except HTTPException as e:
             db.rollback()
@@ -838,9 +847,12 @@ class Friends(Base):
             raise HTTPException(
                 status_code=400, detail="Cannot remove yourself as a friend"
             )
+        
+        # sort the user and friend IDs to ensure consistency
+        user_id, friend_id = sorted([user_id, friend_id])
 
         # Query the Friend instance from the database
-        friend = (
+        friendship = (
             db.query(Friends)
             .filter(
                 or_(
@@ -851,12 +863,12 @@ class Friends(Base):
             .first()
         )
 
-        if friend is None:
+        if friendship is None:
             raise HTTPException(status_code=400, detail="Not friends with this user")
 
         # remove the friend
         try:
-            db.delete(friend)
+            db.delete(friendship)
             db.commit()
             return {"detail": "Friend removed successfully"}
 
@@ -871,7 +883,7 @@ class Friends(Base):
 
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
-
+        
         # Get all friends with additional details
         friendships = (
             db.query(Friends)
