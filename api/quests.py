@@ -91,7 +91,7 @@ def update_quest(
     response_model=list[schemas.MergedQuestResponse],
 )
 def read_user_quests(user_id: int, db: Session = Depends(get_db)):
-    print("DEBUGGING PLEASE!!!" + str(user_id))
+
     # Get all user_quests for this user
     user_quests = (
         db.query(models.UserQuests).filter(models.UserQuests.user_id == user_id).all()
@@ -146,7 +146,6 @@ def read_logged_in_user_quests(
     user_id: int = Depends(auth.decode_jwt),
     db: Session = Depends(get_db),
 ):
-    print("DEBUGGING PLEASE!!!" + str(user_id))
     # Get all user_quests for this user
     user_quests = (
         db.query(models.UserQuests).filter(models.UserQuests.user_id == user_id).all()
