@@ -692,7 +692,8 @@ class EmailVerificationCode(Base):
     code = Column(Integer, nullable=False)
     username = Column(String, primary_key=True)
     valid_until = Column(
-        DateTime, default=datetime.now(timezone.utc) + timedelta(minutes=15)
+        DateTime(timezone=True),
+        default=datetime.now(timezone.utc) + timedelta(minutes=15),
     )
 
     @staticmethod
@@ -736,6 +737,7 @@ class EmailVerificationCode(Base):
                 if old_code.code == code:
                     user = db.query(User).filter(User.username == username).first()
                     user.is_email_verified = True
+                    db.delete(old_code)
                     db.commit()
                     db.refresh(user)
                     return {"messsage": f"{code} {user}"}
