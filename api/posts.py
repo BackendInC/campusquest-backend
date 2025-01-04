@@ -82,11 +82,10 @@ def read_posts(
 def read_post(
     post_id: int,
     db: Session = Depends(get_db),
-    current_user: int = Depends(auth.decode_jwt),
 ):
 
     # Get the post by ID
-    post, likes_count, dislikes_count, username = models.Posts.get_by_id(post_id=post_id, db=db)
+    post, likes_count, dislikes_count, username, questname = models.Posts.get_by_id(post_id=post_id, db=db)
 
     # Return the response
     return schemas.PostResponse(
@@ -100,6 +99,7 @@ def read_post(
         quest_id=models.UserQuests.get_quest_id(post.user_quest_id, db),
         username=username,
         profile_picture_url=f"/users/profile_picture/{username}",
+        questname=questname,
     )
 
 

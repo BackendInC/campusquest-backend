@@ -210,8 +210,8 @@ class Posts(Base):
             .first()
         )
 
-        if user_quest_id is None:
-            return False
+        if user_quest_id:
+            return True
 
         post = (
             db.query(Posts)
@@ -221,10 +221,10 @@ class Posts(Base):
             .first()
         )
 
-        if post is None:
-            return False
+        if post:
+            return True
 
-        return True
+        return False
 
     @staticmethod
     async def upload_image(image: UploadFile = File(...)):
@@ -349,7 +349,15 @@ class Posts(Base):
         # Get user info
         username = (db.query(User.username).filter(User.id == post.user_id)).scalar()
 
-        return post, likes_count, dislikes_count, username
+        # Get quest name
+        quest_name = (
+            db.query(Quests.name)
+            .join(UserQuests, UserQuests.quest_id == Quests.id)
+            .filter(UserQuests.id == post.user_quest_id)
+            .scalar()
+        )
+
+        return post, likes_count, dislikes_count, username, quest_name
 
     @staticmethod
     def get_by_user(user_id, db):

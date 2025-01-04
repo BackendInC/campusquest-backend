@@ -112,6 +112,10 @@ async def upload_profile_picture(
 
     image = Image.open(BytesIO(contents))
 
+    # Convert RGBA to RGB
+    if image.mode == "RGBA":
+        image = image.convert("RGB")
+
     # Convert and encode as JPEG for consistency
     buffer = BytesIO()
     image.save(buffer, format="JPEG", quality=85)  # Adjust quality if needed

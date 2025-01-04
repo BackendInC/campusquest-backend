@@ -108,6 +108,7 @@ class PostResponse(PostBase):
     quest_id: int
     username: str
     profile_picture_url: str
+    questname: Optional[str] = None
 
     class Config:
         orm_mode = True
