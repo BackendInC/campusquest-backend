@@ -3,6 +3,11 @@ from random import randint
 import smtplib
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from io import BytesIO
+from PIL import Image
+from sqlalchemy import func, case
+from sqlalchemy.dialects.postgresql import ENUM
+import enum
 
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Response
@@ -15,18 +20,22 @@ from sqlalchemy import (
     LargeBinary,
     ForeignKey,
     UniqueConstraint,
+    CheckConstraint,
     Float,
     Boolean,
     or_,
     and_,
 )
 
-from sqlalchemy.orm import Session, relationship
+from sqlalchemy.orm import Session, relationship, aliased
 from datetime import datetime, timezone, timedelta
 from db import Base
 import base64
 import api.utils as utils
 import db.schemas as schemas
+
+MAX_FILE_SIZE = 5 * 1024 * 1024
+ALLOWED_CONTENT_TYPES = ["image/jpeg", "image/png"]
 
 
 class User(Base):
@@ -48,6 +57,12 @@ class User(Base):
     selected_bee: int = Column(Integer, nullable=False, default=0)
 
     is_email_verified = Column(Boolean, nullable=False, default=False)
+
+    # Relationships
+    posts = relationship("Posts", back_populates="user", cascade="all, delete-orphan")
+    reactions = relationship(
+        "PostReactions", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return (
@@ -140,10 +155,9 @@ class Quests(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     name = Column(String, nullable=False)
     description = Column(String, nullable=False)
-
+    image = Column(LargeBinary, nullable=True)  # put base64 encoded image here
     location_long = Column(Float, nullable=True)
     location_lat = Column(Float, nullable=True)
-    image = Column(LargeBinary, nullable=True)  # put base64 encoded image here
     points = Column(Integer, nullable=False)  # Points awarded for completing the quest
     start_date = Column(Date, nullable=False, default=datetime.now(timezone.utc))
     end_date = Column(DateTime, nullable=True)
@@ -169,68 +183,452 @@ class Posts(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     user_quest_id = Column(Integer, ForeignKey("user_quests.id"), nullable=False)
 
+    user = relationship("User", back_populates="posts")
     user_quest = relationship("UserQuests", back_populates="post")
+    reactions = relationship(
+        "PostReactions", back_populates="post", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        UniqueConstraint("user_quest_id", "user_id", name="_user_quest_user_post_uc"),
+    )
 
     def __repr__(self):
         return (
             f"<Posts(id={self.id}, caption={self.caption}, user_id={self.user_id}, "
-            f"created_at={self.created_at})>"
+            f"created_at={self.created_at}, user_quest_id={self.user_quest_id})>"
         )
 
     @staticmethod
-    def create(new_post, db):
+    def check_posted(user_id, quest_id, db):
+        user_quest_id = (
+            db.query(UserQuests.id)
+            .filter(
+                UserQuests.user_id == user_id,
+                UserQuests.quest_id == quest_id,
+            )
+            .first()
+        )
+
+        if user_quest_id is None:
+            return False
+
+        post = (
+            db.query(Posts)
+            .filter(
+                Posts.user_quest_id == user_quest_id,
+            )
+            .first()
+        )
+
+        if post is None:
+            return False
+
+        return True
+
+    @staticmethod
+    async def upload_image(image: UploadFile = File(...)):
+        # validate image type
+        if image.content_type not in ALLOWED_CONTENT_TYPES:
+            raise HTTPException(
+                status_code=400, detail="Only JPEG and PNG images are allowed"
+            )
+
+        # read the raw file contents
+        contents = await image.read()
+
+        # validate file size
+        if len(contents) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="File size too large")
+
+        # Try to open the image using Pillow
         try:
+            image = Image.open(BytesIO(contents))
+            if image.format not in ["JPEG", "PNG"]:
+                raise HTTPException(status_code=400, detail="Invalid file format")
+        except Exception as e:
+            raise HTTPException(status_code=400, detail="Invalid image file")
+
+        # Convert RGBA to RGB
+        if image.mode == "RGBA":
+            image = image.convert("RGB")
+
+        # convert and encode as JPEG for consistency
+        buffer = BytesIO()
+        image.save(buffer, format="JPEG", quality=85)
+        buffer.seek(0)
+        image_data = buffer.getvalue()
+
+        return image_data
+
+    @staticmethod
+    def create_post_transcation(user_id, quest_id, caption, image_data, db):
+        try:
+            # create a new user quest and flush to get the id
+            new_user_quest = UserQuests(
+                user_id=user_id,
+                quest_id=quest_id,
+                is_done=True,
+            )
+
+            db.add(new_user_quest)
+            db.flush()
+
+            # create a new post
+            new_post = Posts(
+                user_id=user_id,
+                caption=caption,
+                image=image_data,
+                user_quest_id=new_user_quest.id,
+            )
+
             db.add(new_post)
             db.commit()
             db.refresh(new_post)
 
-            return {
-                "id": new_post.id,
-                "user_id": new_post.user_id,
-                "caption": new_post.caption,
-                "created_at": new_post.created_at,
-                "image": base64.b64encode(new_post.image).decode(
-                    "utf-8"
-                ),  # encode the image as base64
-            }
+            return new_post
+
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(
+                status_code=500, detail=f"Failed to create post: {str(e)}"
+            )
+
+    @staticmethod
+    def get_all(db):
+        posts = (
+            db.query(
+                Posts.id,
+                Posts.user_id,
+                Posts.caption,
+                Posts.created_at,
+                Posts.user_quest_id,
+                func.count(case((PostReactions.reaction_type == "LIKE", 1))).label(
+                    "likes_count"
+                ),
+                func.count(case((PostReactions.reaction_type == "DISLIKE", 1))).label(
+                    "dislikes_count"
+                ),
+                User.username,  # Directly joining User to fetch the username
+            )
+            .outerjoin(PostReactions, PostReactions.post_id == Posts.id)
+            .join(User, User.id == Posts.user_id)  # Join the User table directly
+            .group_by(Posts.id, User.id)  # Group by both Posts and User
+            .all()
+        )
+
+        return posts
+
+    @staticmethod
+    def get_by_id(post_id, db):
+        # Get the post by ID
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+
+        # Check if post exists
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # Count likes and dislikes for the post
+        likes_count = (
+            db.query(func.count(PostReactions.id))
+            .filter(
+                PostReactions.post_id == post.id, PostReactions.reaction_type == "LIKE"
+            )
+            .scalar()
+        )
+
+        dislikes_count = (
+            db.query(func.count(PostReactions.id))
+            .filter(
+                PostReactions.post_id == post.id,
+                PostReactions.reaction_type == "DISLIKE",
+            )
+            .scalar()
+        )
+
+        # Get user info
+        username = (db.query(User.username).filter(User.id == post.user_id)).scalar()
+
+        return post, likes_count, dislikes_count, username
+
+    @staticmethod
+    def get_by_user(user_id, db):
+        # Check if user exists
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # Query posts with aggregated likes and dislikes count
+        posts = (
+            db.query(
+                Posts.id,
+                Posts.user_id,
+                Posts.caption,
+                Posts.created_at,
+                Posts.user_quest_id,
+                func.count(case((PostReactions.reaction_type == "LIKE", 1))).label(
+                    "likes_count"
+                ),
+                func.count(case((PostReactions.reaction_type == "DISLIKE", 1))).label(
+                    "dislikes_count"
+                ),
+                User.username,
+            )
+            .filter(Posts.user_id == user_id)
+            .outerjoin(PostReactions, PostReactions.post_id == Posts.id)
+            .join(User, User.id == Posts.user_id)
+            .group_by(
+                Posts.id, User.id
+            )  # Add User.id here to group by both Posts and User
+            .all()
+        )
+
+        return posts
+
+    @staticmethod
+    def update(post_id, caption, current_user, db):
+        # get the post by id
+        post_db = db.query(Posts).filter(Posts.id == post_id).first()
+
+        # check if post exists
+        if not post_db:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # check if the user owns the post
+        if post_db.user_id != current_user:
+            raise HTTPException(
+                status_code=403, detail="You are not the owner of this post"
+            )
+
+        # update the post
+        try:
+            post_db.caption = caption
+            db.commit()
+            db.refresh(post_db)
+
+            return schemas.PostUpdateResponse(
+                id=post_db.id,
+                user_id=post_db.user_id,
+                caption=post_db.caption,
+            )
 
         except Exception as e:
             raise HTTPException(
-                status_code=400, detail=f"Failed to create post: {str(e)}"
+                status_code=400, detail=f"Failed to update post: {str(e)}"
             )
 
 
-class PostLikes(Base):
-    __tablename__ = "post_likes"
+class ReactionType(enum.Enum):
+    LIKE = "LIKE"
+    DISLIKE = "DISLIKE"
+
+
+reaction_type_enum = ENUM(ReactionType, name="reactiontype")
+
+
+class PostReactions(Base):
+    __tablename__ = "post_reactions"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    reaction_type = Column(
+        ENUM(ReactionType, name="reactiontype", create_type=False), nullable=False
+    )
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
 
-    def __repr__(self):
-        return (
-            f"<PostLikes(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"created_at={self.created_at})>"
-        )
-
-
-class PostComments(Base):
-    __tablename__ = "post_comments"
-
-    id = Column(Integer, primary_key=True, autoincrement=True)
-    post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    content = Column(String(500), nullable=False)
-    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    post = relationship("Posts", back_populates="reactions")
+    user = relationship("User", back_populates="reactions")
 
     def __repr__(self):
         return (
-            f"<PostComments(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
-            f"content={self.content}, created_at={self.created_at})>"
+            f"<PostReactions(id={self.id}, post_id={self.post_id}, user_id={self.user_id}, "
+            f"reaction_type={self.reaction_type}, created_at={self.created_at})>"
         )
+
+    @staticmethod
+    def is_liked(post_id, user_id, db):
+        like = (
+            db.query(PostReactions)
+            .filter(
+                PostReactions.user_id == user_id,
+                PostReactions.post_id == post_id,
+                PostReactions.reaction_type == "LIKE",
+            )
+            .first()
+        )
+
+        return like
+
+    def unlike_post(self, db):
+        try:
+            response = schemas.PostReactionResponse(
+                id=self.id,
+                user_id=self.user_id,
+                post_id=self.post_id,
+                message="Post unliked successfully",
+            )
+            db.delete(self)
+            db.commit()
+            return response
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to unlike post: {str(e)}"
+            )
+
+    @staticmethod
+    def is_disliked(post_id, user_id, db):
+        dislike = (
+            db.query(PostReactions)
+            .filter(
+                PostReactions.user_id == user_id,
+                PostReactions.post_id == post_id,
+                PostReactions.reaction_type == "DISLIKE",
+            )
+            .first()
+        )
+
+        return dislike
+
+    def remove_dislike(self, db):
+        try:
+            response = schemas.PostReactionResponse(
+                id=self.id,
+                user_id=self.user_id,
+                post_id=self.post_id,
+                message="Dislike removed successfully",
+            )
+            db.delete(self)
+            db.commit()
+            return response
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to remove dislike: {str(e)}"
+            )
+
+    @staticmethod
+    def like_post(post_id, user_id, db):
+        new_like = PostReactions(user_id=user_id, post_id=post_id, reaction_type="LIKE")
+
+        try:
+            db.add(new_like)
+            db.commit()
+            db.refresh(new_like)
+
+            response = schemas.PostReactionResponse(
+                id=new_like.id,
+                user_id=new_like.user_id,
+                post_id=new_like.post_id,
+                message="Post liked successfully",
+            )
+            return response
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to like post: {str(e)}"
+            )
+
+    @staticmethod
+    def dislike_post(post_id, user_id, db):
+        new_dislike = PostReactions(
+            user_id=user_id, post_id=post_id, reaction_type="DISLIKE"
+        )
+
+        try:
+            db.add(new_dislike)
+            db.commit()
+            db.refresh(new_dislike)
+
+            response = schemas.PostReactionResponse(
+                id=new_dislike.id,
+                user_id=new_dislike.user_id,
+                post_id=new_dislike.post_id,
+                message="Post disliked successfully",
+            )
+            return response
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to dislike post: {str(e)}"
+            )
+
+    @staticmethod
+    def get_likedby(post_id, db):
+        users = (
+            db.query(User)
+            .join(PostReactions)
+            .filter(
+                PostReactions.post_id == post_id,
+                PostReactions.reaction_type == "LIKE",
+            )
+            .all()
+        )
+
+        return users
+
+    @staticmethod
+    def get_dislikedby(post_id, db):
+        users = (
+            db.query(User)
+            .join(PostReactions)
+            .filter(
+                PostReactions.post_id == post_id,
+                PostReactions.reaction_type == "DISLIKE",
+            )
+            .all()
+        )
+
+        return users
+
+    @staticmethod
+    def get_likes_count(post_id, db):
+        # check if post exists
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # count the number of likes for a post
+        try:
+            count = (
+                db.query(PostReactions)
+                .filter(
+                    PostReactions.post_id == post_id,
+                    PostReactions.reaction_type == "LIKE",
+                )
+                .count()
+            )
+            return count
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to get likes count: {str(e)}"
+            )
+
+    @staticmethod
+    def get_dislikes_count(post_id, db):
+        # check if post exists
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # count the number of dislikes for a post
+        try:
+            count = (
+                db.query(PostReactions)
+                .filter(
+                    PostReactions.post_id == post_id,
+                    PostReactions.reaction_type == "DISLIKE",
+                )
+                .count()
+            )
+            return count
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to get dislikes count: {str(e)}"
+            )
 
 
 class EmailVerificationCode(Base):
@@ -346,13 +744,53 @@ class UserQuests(Base):
     date_completed = Column(DateTime, default=datetime.now(timezone.utc))
     is_verified = Column(Boolean, default=False, nullable=False)
 
-    post = relationship("Posts", back_populates="user_quest", cascade="all, delete-orphan")
+    post = relationship(
+        "Posts", back_populates="user_quest", cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return (
             f"<UserQuests(id={self.id}, user_id={self.user_id}, quest_id={self.quest_id}, is_done={self.is_done}, "
             f"date_completed={self.date_completed}, is_verified={self.is_verified} )>"
         )
+
+    @staticmethod
+    def get_quest_id(user_quest_id: int, db: Session):
+        # get user quest object
+        user_quest = db.query(UserQuests).filter(UserQuests.id == user_quest_id).first()
+        return user_quest.quest_id
+
+    @staticmethod
+    def delete(post_id: int, user_id: int, db: Session):
+        # get the post by id
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # check if the user is the owner of the post
+        if post.user_id != user_id:
+            raise HTTPException(
+                status_code=403, detail="You are not the owner of this post"
+            )
+
+        # get the user_quest
+        user_quest = (
+            db.query(UserQuests).filter(UserQuests.id == post.user_quest_id).first()
+        )
+
+        if not user_quest:
+            raise HTTPException(status_code=404, detail="UserQuest not found")
+
+        # delete the post
+        try:
+            db.delete(user_quest)
+            db.commit()
+            return {"detail": "Post and UserQuest deleted successfully"}
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=400, detail=f"Failed to delete post: {str(e)}"
+            )
 
 
 class QuestVerification(Base):
@@ -376,47 +814,51 @@ class Friends(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     friend_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+    # relationships
+    user = relationship("User", foreign_keys=[user_id])
+    friend = relationship("User", foreign_keys=[friend_id])
 
     # Ensure that a user cannot be friends with the same user twice
-    __table_args__ = (UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),)
+    __table_args__ = (
+        UniqueConstraint("user_id", "friend_id", name="_user_friend_uc"),
+        CheckConstraint("user_id < friend_id", name="_user_not_friend"),
+        CheckConstraint("user_id != friend_id", name="_user_not_self"),
+    )
 
     def __repr__(self):
-        return (
-            f"<Friends("
-            f"id={self.id}, "
-            f"user_id={self.user_id}, "
-            f"friend_id={self.friend_id}, "
-            f"created_at={self.created_at}"
-            f")>"
-        )
+        return f"<Friends(id={self.id}, user_id={self.user_id}, friend_id={self.friend_id}, created_at={self.created_at})>"
 
     @staticmethod
     def are_friends(user_id: int, friend_id: int, db: Session) -> bool:
-        """
-        Returns True if the given two users are friends
-        (in either direction). Otherwise, False.
-        """
-        return (
+        # Ensure that the user and friend are not the same
+        if user_id == friend_id:
+            return False
+
+        # sort the user and friend IDs to ensure consistency
+        user, friend = sorted([user_id, friend_id])
+
+        # Check if the users are already friends
+        response = (
             db.query(Friends)
-            .filter(
-                or_(
-                    and_(Friends.user_id == user_id, Friends.friend_id == friend_id),
-                    and_(Friends.user_id == friend_id, Friends.friend_id == user_id),
-                )
-            )
+            .filter(Friends.user_id == user, Friends.friend_id == friend)
             .first()
-            is not None
         )
 
+        if response is None:
+            return False
+
+        return True
+
     @staticmethod
-    def create_friend(user_id: int, friend_id: int, db: Session) -> "Friends":
-        """
-        Creates a friendship between user_id and friend_id, if they
-        are not already friends and not the same user.
-        """
-        # check if the friend_id is a real user
+    def create_friend(user_id, friend_id, db) -> "Friends":
+        # check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        # check if the friend is a user
         friend_user = db.query(User).filter(User.id == friend_id).first()
+
         if friend_user is None:
             raise HTTPException(status_code=404, detail="Friend not found")
 
@@ -432,35 +874,46 @@ class Friends(Base):
                 status_code=400, detail="Already friends with this user"
             )
 
-        new_friend = Friends(user_id=user_id, friend_id=friend_id)
+        # sort the user and friend IDs to ensure consistency
+        user_id, friend_id = sorted([user_id, friend_id])
+
+        # create a new friend instance
+        new_friendship = Friends(user_id=user_id, friend_id=friend_id)
+
+        # add and commit the friend to the database
         try:
-            db.add(new_friend)
+            db.add(new_friendship)
             db.commit()
-            db.refresh(new_friend)
-            return new_friend
-        except Exception as e:
+            db.refresh(new_friendship)
+
+            return new_friendship
+
+        except HTTPException as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to create friend: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to create friend {e}")
 
     @staticmethod
-    def remove_friend(user_id: int, friend_id: int, db: Session):
-        """
-        Removes a friendship between user_id and friend_id if it exists.
-        """
-        # prevent removing yourself
+    def remove_friend(user_id, friend_id, db):
+        # check if the user is a user
+        user = db.query(User).filter(User.id == user_id).first()
+
+        # check if the friend is a user
+        friend_user = db.query(User).filter(User.id == friend_id).first()
+
+        if not (friend_user and user):
+            raise HTTPException(status_code=404, detail="Friend not found")
+
+        # prevent removing yourself as a friend
         if user_id == friend_id:
             raise HTTPException(
                 status_code=400, detail="Cannot remove yourself as a friend"
             )
 
-        # check if they are friends
-        if not Friends.are_friends(user_id, friend_id, db):
-            raise HTTPException(
-                status_code=400, detail="You are not friends with this user"
-            )
+        # sort the user and friend IDs to ensure consistency
+        user_id, friend_id = sorted([user_id, friend_id])
 
-        # find the friendship row (in either direction)
-        friend_row = (
+        # Query the Friend instance from the database
+        friendship = (
             db.query(Friends)
             .filter(
                 or_(
@@ -471,70 +924,100 @@ class Friends(Base):
             .first()
         )
 
-        if friend_row is None:
-            raise HTTPException(status_code=404, detail="Friendship not found")
+        if friendship is None:
+            raise HTTPException(status_code=400, detail="Not friends with this user")
 
+        # remove the friend
         try:
-            db.delete(friend_row)
+            db.delete(friendship)
             db.commit()
-        except Exception as e:
+            return {"detail": "Friend removed successfully"}
+
+        except HTTPException as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=f"Failed to remove friend: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to remove friend {e}")
 
     @staticmethod
-    def list_friends(user_id: int, db: Session) -> list[int]:
-        """
-        Returns a list of friend IDs for the given user_id.
-        """
-        # Make sure the user exists
+    def get_friends(user_id, db):
+        # Check if the user exists
         user = db.query(User).filter(User.id == user_id).first()
+
         if user is None:
             raise HTTPException(status_code=404, detail="User not found")
 
-        # Get all friendship rows where the user is either user_id or friend_id
-        friend_rows = (
+        # Get all friends with additional details
+        friendships = (
             db.query(Friends)
-            .filter(or_(Friends.user_id == user_id, Friends.friend_id == user_id))
+            .filter((Friends.user_id == user_id) | (Friends.friend_id == user_id))
             .all()
         )
 
-        # Convert those rows to a list of friend user IDs
-        friend_ids = []
-        for frow in friend_rows:
-            if frow.user_id == user_id:
-                friend_ids.append(frow.friend_id)
+        # Process friends to include binary profile picture
+        friends_details = []
+        for friendship in friendships:
+            if friendship.user_id == user_id:
+                friend_id = friendship.friend.id
+                username = friendship.friend.username
             else:
-                friend_ids.append(frow.user_id)
+                friend_id = friendship.user.id
+                username = friendship.user.username
 
-        return friend_ids
+            # Append the processed friend data
+            friends_details.append(
+                {
+                    "id": friendship.id,
+                    "friend_id": friend_id,
+                    "username": username,
+                    "profile_picture_url": f"/users/profile_picture/{username}",
+                }
+            )
+
+        return friends_details
 
     @staticmethod
-    def get_mutual_friends(user_id: int, other_id: int, db: Session) -> list[int]:
-        # Check that both users exist
-        user = db.query(User).filter(User.id == user_id).first()
-        other_user = db.query(User).filter(User.id == other_id).first()
-        if not user or not other_user:
-            raise HTTPException(status_code=404, detail="User(s) not found")
+    def get_mutuals(user_id, friend_id, db):
+        # Check if both users exist
+        users_exist = (
+            db.query(User.id).filter(User.id.in_([user_id, friend_id])).count()
+        )
+        if users_exist < 2:
+            raise HTTPException(status_code=404, detail="One or both users not found")
 
-        # all friend IDs for user_id
-        user_friend_ids = set()
-        user_friend_rows = Friends.list_friends(user_id, db)
-        for frow in user_friend_rows:
-            # if user is the 'user_id', friend is the 'friend_id'
-            if frow.user_id == user_id:
-                user_friend_ids.add(frow.friend_id)
-            else:
-                user_friend_ids.add(frow.user_id)
+        # Get friend IDs for the first user
+        user_friend_ids = (
+            db.query(Friends.user_id, Friends.friend_id)
+            .filter((Friends.user_id == user_id) | (Friends.friend_id == user_id))
+            .all()
+        )
+        # Correct the set comprehension
+        user_friend_ids = {f1 if f1 != user_id else f2 for f1, f2 in user_friend_ids}
 
-        # all friend IDs for other_id
-        other_friend_ids = set()
-        other_friend_rows = Friends.list_friends(other_id, db)
-        for frow in other_friend_rows:
-            if frow.user_id == other_id:
-                other_friend_ids.add(frow.friend_id)
-            else:
-                other_friend_ids.add(frow.user_id)
+        # Get friend IDs for the second user
+        friend_friend_ids = (
+            db.query(Friends.user_id, Friends.friend_id)
+            .filter((Friends.user_id == friend_id) | (Friends.friend_id == friend_id))
+            .all()
+        )
+        # Correct the set comprehension
+        friend_friend_ids = {
+            f1 if f1 != friend_id else f2 for f1, f2 in friend_friend_ids
+        }
 
-        # intersection of both sets
-        mutual_ids = user_friend_ids.intersection(other_friend_ids)
-        return list(mutual_ids)
+        # Get mutual friend IDs
+        mutual_friend_ids = user_friend_ids.intersection(friend_friend_ids)
+
+        # Fetch mutual friend details
+        mutual_friends = db.query(User).filter(User.id.in_(mutual_friend_ids)).all()
+
+        if not mutual_friends:
+            return []
+
+        # Return mutual friends as a list of dictionaries
+        return [
+            schemas.MutualFriendResponse(
+                friend_id=mf.id,
+                username=mf.username,
+                profile_picture_url=f"/users/profile_picture/{mf.username}",
+            )
+            for mf in mutual_friends
+        ]

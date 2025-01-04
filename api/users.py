@@ -178,7 +178,12 @@ def get_profile_info(
 
     # count the number of likes
     num_likes = (
-        db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).count()
+        db.query(models.PostReactions)
+        .filter(
+            models.PostReactions.user_id == user_id,
+            models.PostReactions.reaction_type == "LIKE",
+        )
+        .count()
     )
 
     # count the number of achievements

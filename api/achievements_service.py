@@ -76,7 +76,7 @@ class AchievementService:
     ) -> List[dict]:
         """Check achievements related to making friends."""
         new_achievements = []
-        friend_count = len(models.Friends.list_friends(user_id, db))
+        friend_count = len(models.Friends.get_friends(user_id, db))
 
         for milestone, achievement in milestones.FRIEND_MILESTONES.items():
             if (
@@ -96,9 +96,15 @@ class AchievementService:
 
         # Count total likes received on all user's posts
         total_likes = (
-            db.query(func.count(models.PostLikes.id))
-            .join(models.Posts, models.Posts.id == models.PostLikes.post_id)
-            .filter(models.Posts.user_id == user_id)
+            db.query(func.count(models.PostReactions.id))
+            .join(
+                models.Posts,
+                models.Posts.id == models.PostReactions.post_id,
+            )
+            .filter(
+                models.Posts.user_id == user_id,
+                models.PostReactions.reaction_type == "LIKE",
+            )
             .scalar()
         )
 
