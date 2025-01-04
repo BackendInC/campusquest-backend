@@ -68,7 +68,9 @@ def read_friends_posts(
     try:
         posts = (
             db.query(models.Posts)
-            .filter(models.Posts.user_id.in_([friend["id"] for friend in friends]))
+            .filter(
+                models.Posts.user_id.in_([friend["friend_id"] for friend in friends])
+            )
             .order_by(desc(models.Posts.created_at))
             .all()
         )
