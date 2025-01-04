@@ -20,7 +20,7 @@ def get_quest_id_from_user_quest_id(user_quest_id: int, db: Session):
 
 
 # read all posts no need for authentication since all users can see all posts
-@router.get("/feed", response_model=list[schemas.PostResponse])
+@router.get("/feed", response_model=list[schemas.FeedResponse])
 def read_posts(db: Session = Depends(get_db)):
     # get all posts from the database sorted by created_at
     posts = db.query(models.Posts).order_by(desc(models.Posts.created_at)).all()
@@ -33,7 +33,7 @@ def read_posts(db: Session = Depends(get_db)):
             .username
         )
         feedPosts.append(
-            schemas.PostResponse(
+            schemas.FeedResponse(
                 id=post.id,
                 user_id=post.user_id,
                 caption=post.caption,
@@ -49,7 +49,7 @@ def read_posts(db: Session = Depends(get_db)):
 
 
 # get the posts by friends
-@router.get("/feed/friends", response_model=list[schemas.PostResponse])
+@router.get("/feed/friends", response_model=list[schemas.FeedResponse])
 def read_friends_posts(
     db: Session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)
 ):
@@ -82,7 +82,7 @@ def read_friends_posts(
                 .username
             )
             feedPosts.append(
-                schemas.PostResponse(
+                schemas.FeedResponse(
                     id=post.id,
                     user_id=post.user_id,
                     caption=post.caption,

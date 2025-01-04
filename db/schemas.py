@@ -103,8 +103,8 @@ class PostCreateResponse(PostBase):
 
 class PostResponse(PostBase):
     id: int  # autoincrement id
-    likes_count: Optional[int] = 0
-    dislikes_count: Optional[int] = 0
+    likes_count: int
+    dislikes_count: int
     quest_id: int
     username: str
     profile_picture_url: str
@@ -127,6 +127,14 @@ class PostUpdateResponse(PostUpdate):
     class Config:
         orm_mode = True
 
+class FeedResponse(PostBase):
+    id: int  # autoincrement id
+    quest_id: int
+    username: str
+    profile_picture_url: str
+
+    class Config:
+        orm_mode = True
 
 class PostReactionBase(BaseModel):
     user_id: int
