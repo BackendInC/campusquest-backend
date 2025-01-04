@@ -9,16 +9,16 @@ router = APIRouter()
 
 
 # add a new friend
-@router.post("/friends")
+@router.post("/friends/{friend_id}", response_model=dict)
 def add_friend(
-    friend: schemas.FriendCreate,
+    friend_id: int,
     db: session = Depends(get_db),
     user_id: int = Depends(auth.decode_jwt),
 ):
     try:
         # create a new friend instance
         response = models.Friends.create_friend(
-            user_id=user_id, friend_id=friend.friend_id, db=db
+            user_id=user_id, friend_id=friend_id, db=db
         )
         new_achievements = AchievementService.check_achievements(user_id, db)
         response = {
@@ -80,4 +80,3 @@ def get_mutual_friends(
 ):
     # get mutual friends
     return models.Friends.get_mutuals(user_id=user_id, friend_id=friend_id, db=db)
-

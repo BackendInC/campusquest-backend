@@ -127,6 +127,7 @@ class PostUpdateResponse(PostUpdate):
     class Config:
         orm_mode = True
 
+
 class FeedResponse(PostBase):
     id: int  # autoincrement id
     quest_id: int
@@ -135,6 +136,7 @@ class FeedResponse(PostBase):
 
     class Config:
         orm_mode = True
+
 
 class PostReactionBase(BaseModel):
     user_id: int
@@ -238,13 +240,6 @@ class QuestVerification(BaseModel):
 class FriendBase(BaseModel):
     friend_id: int
     user_id: int
-
-    class Config:
-        orm_mode = True
-
-
-class FriendCreate(BaseModel):
-    friend_id: int
 
     class Config:
         orm_mode = True
