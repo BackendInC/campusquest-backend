@@ -92,6 +92,7 @@ class PostCreate(BaseModel):
     class Config:
         orm_mode = True
 
+
 class PostCreateResponse(PostBase):
     id: int  # autoincrement id
     quest_id: int
@@ -99,10 +100,11 @@ class PostCreateResponse(PostBase):
     class Config:
         orm_mode = True
 
+
 class PostResponse(PostBase):
     id: int  # autoincrement id
-    likes_count: int
-    dislikes_count: int
+    likes_count: Optional[int] = 0
+    dislikes_count: Optional[int] = 0
     quest_id: int
     username: str
     profile_picture_url: str
@@ -110,11 +112,13 @@ class PostResponse(PostBase):
     class Config:
         orm_mode = True
 
+
 class PostUpdate(BaseModel):
     caption: str
 
     class Config:
         orm_mode = True
+
 
 class PostUpdateResponse(PostUpdate):
     id: int  # autoincrement id
@@ -122,6 +126,7 @@ class PostUpdateResponse(PostUpdate):
 
     class Config:
         orm_mode = True
+
 
 class PostReactionBase(BaseModel):
     user_id: int
@@ -229,12 +234,14 @@ class FriendBase(BaseModel):
     class Config:
         orm_mode = True
 
+
 class FriendCreate(BaseModel):
     friend_id: int
 
     class Config:
         orm_mode = True
-        
+
+
 class FriendCreateResponse(FriendBase):
     id: int
     message: str
@@ -248,6 +255,7 @@ class FriendResponse(BaseModel):
 
     class Config:
         orm_mode = True
+
 
 class MutualFriendResponse(BaseModel):
     friend_id: int

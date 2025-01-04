@@ -26,6 +26,12 @@ def read_posts(db: Session = Depends(get_db)):
     posts = db.query(models.Posts).order_by(desc(models.Posts.created_at)).all()
     feedPosts = []
     for post in posts:
+        username = (
+            db.query(models.User)
+            .filter(models.User.id == post.user_id)
+            .first()
+            .username
+        )
         feedPosts.append(
             schemas.PostResponse(
                 id=post.id,
@@ -34,6 +40,8 @@ def read_posts(db: Session = Depends(get_db)):
                 created_at=post.created_at,
                 image_url=f"/posts/image/{post.id}",
                 quest_id=get_quest_id_from_user_quest_id(post.user_quest_id, db),
+                username=username,
+                profile_picture_url=f"/users/profile_picture/{username}",
             )
         )
 
@@ -47,7 +55,7 @@ def read_friends_posts(
 ):
     # Get user friends
     try:
-        friends = models.Friends.list_friends(user_id, db)
+        friends = models.Friends.get_friends(user_id, db)
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch friends: {str(e)}"
@@ -60,13 +68,19 @@ def read_friends_posts(
     try:
         posts = (
             db.query(models.Posts)
-            .filter(models.Posts.user_id.in_([friend for friend in friends]))
+            .filter(models.Posts.user_id.in_([friend["id"] for friend in friends]))
             .order_by(desc(models.Posts.created_at))
             .all()
         )
 
         feedPosts = []
         for post in posts:
+            username = (
+                db.query(models.User)
+                .filter(models.User.id == post.user_id)
+                .first()
+                .username
+            )
             feedPosts.append(
                 schemas.PostResponse(
                     id=post.id,
@@ -75,6 +89,8 @@ def read_friends_posts(
                     created_at=post.created_at,
                     image_url=f"/posts/image/{post.id}",
                     quest_id=get_quest_id_from_user_quest_id(post.user_quest_id, db),
+                    username=username,
+                    profile_picture_url=f"/users/profile_picture/{username}",
                 )
             )
 
