@@ -7,6 +7,14 @@ from api.friends import router as friendsRouter
 from api.posts import router as postsRouter
 from api.feed import router as feedRouter
 from api.admin import router as adminRouter
+from api.milestones import (
+    QUEST_MILESTONES,
+    FRIEND_MILESTONES,
+    LIKE_MILESTONES,
+    VERIFICATION_MILESTONES,
+)
+
+from db import models, get_db
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -29,3 +37,16 @@ app.include_router(friendsRouter)
 app.include_router(postsRouter)
 app.include_router(feedRouter)
 app.include_router(adminRouter)
+
+
+@app.on_event("startup")
+async def startup_event():
+    db = next(get_db())
+    try:
+        models.Achievements.load_achievements(QUEST_MILESTONES, db)
+        models.Achievements.load_achievements(FRIEND_MILESTONES, db)
+        models.Achievements.load_achievements(LIKE_MILESTONES, db)
+        models.Achievements.load_achievements(VERIFICATION_MILESTONES, db)
+    except Exception:
+        print("Error loading achievements!")
+        print("Assuming they are already defined.")
