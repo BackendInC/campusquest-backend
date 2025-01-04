@@ -570,6 +570,44 @@ class PostReactions(Base):
         )
 
         return users
+    
+    @staticmethod
+    def get_likes_count(post_id, db):
+        # check if post exists
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # count the number of likes for a post
+        try:
+            count = (
+                db.query(PostReactions)
+                .filter(PostReactions.post_id == post_id, PostReactions.reaction_type == "LIKE")
+                .count()
+            )
+            return count
+        
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to get likes count: {str(e)}")
+        
+    @staticmethod
+    def get_dislikes_count(post_id, db):
+        # check if post exists
+        post = db.query(Posts).filter(Posts.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+
+        # count the number of dislikes for a post
+        try:
+            count = (
+                db.query(PostReactions)
+                .filter(PostReactions.post_id == post_id, PostReactions.reaction_type == "DISLIKE")
+                .count()
+            )
+            return count
+        
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Failed to get dislikes count: {str(e)}")
 
 
 class EmailVerificationCode(Base):

@@ -23,15 +23,15 @@ async def create_post(
 ):
     try:
         # Check if the user has a post for this quest+id already
-        if models.Posts.check_posted(current_user, quest_id, db):
+        if models.Posts.check_posted(user_id=current_user, quest_id=quest_id, db=db):
             raise HTTPException(status_code=400, detail="User has already submitted.")
 
         # Upload the image
-        image_data = await models.Posts.upload_image(image)
+        image_data = await models.Posts.upload_image(image=image)
 
         # create new userquest and new post
         new_post = models.Posts.create_post_transcation(
-            current_user, quest_id, caption, image_data, db
+            user_id=current_user, quest_id=quest_id, caption=caption, image_data=image_data, db=db
         )
 
         return schemas.PostCreateResponse(
@@ -55,7 +55,7 @@ def read_posts(
 ):
 
     # Get all posts
-    posts = models.Posts.get_all(db)
+    posts = models.Posts.get_all(db=db)
 
     # Map query results to response model
     return [
@@ -84,7 +84,7 @@ def read_post(
 ):
 
     # Get the post by ID
-    post, likes_count, dislikes_count, username = models.Posts.get_by_id(post_id, db)
+    post, likes_count, dislikes_count, username = models.Posts.get_by_id(post_id=post_id, db=db)
 
     # Return the response
     return schemas.PostResponse(
@@ -135,7 +135,7 @@ def read_user_posts(
     db: Session = Depends(get_db),
     current_user: int = Depends(auth.decode_jwt),
 ):
-    posts = models.Posts.get_by_user(user_id, db)
+    posts = models.Posts.get_by_user(user_id=user_id, db=db)
 
     return [
         schemas.PostResponse(
@@ -163,7 +163,7 @@ def update_post(
     current_user: int = Depends(auth.decode_jwt),
 ):
     try:
-        response = models.Posts.update(post_id, post.caption, current_user, db)
+        response = models.Posts.update(post_id=post_id, caption=post.caption, current_user=current_user, db=db)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to update post: {str(e)}")
@@ -177,7 +177,7 @@ def delete_post(
     current_user: int = Depends(auth.decode_jwt),
 ):
     try:
-        response = models.UserQuests.delete(post_id, current_user, db)
+        response = models.UserQuests.delete(post_id=post_id, user_id=current_user, db=db)
         return response
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to delete post: {str(e)}")
@@ -196,7 +196,7 @@ def toggle_like(
         raise HTTPException(status_code=404, detail="Post not found")
 
     # check if the user has liked the post
-    like = models.PostReactions.is_liked(current_user, post_id, db)
+    like = models.PostReactions.is_liked(post_id=post_id, user_id=current_user, db=db)
 
     # unlike the post if the user has liked it
     if like is not None:
@@ -204,14 +204,14 @@ def toggle_like(
         return response
 
     # check if the user disliked the post
-    dislike = models.PostReactions.is_disliked(current_user, post_id, db)
+    dislike = models.PostReactions.is_disliked(post_id=post_id, user_id=current_user, db=db)
 
     # remove dislike if the user has disliked the post
     if dislike is not None:
         response = dislike.remove_dislike(db)
 
     # like the post if the user has not liked it
-    response = models.PostReactions.like_post(current_user, post_id, db)
+    response = models.PostReactions.like_post(post_id=post_id, user_id=current_user, db=db)
     return response
 
 
@@ -228,7 +228,7 @@ def toggle_dislike(
         raise HTTPException(status_code=404, detail="Post not found")
 
     # check if the user has disliked the post
-    dislike = models.PostReactions.is_disliked(current_user, post_id, db)
+    dislike = models.PostReactions.is_disliked(post_id=post_id, user_id=current_user, db=db)
 
     # undo the dislike if the user has disliked it
     if dislike is not None:
@@ -236,14 +236,14 @@ def toggle_dislike(
         return response
 
     # check if the user liked the post
-    like = models.PostReactions.is_liked(current_user, post_id, db)
+    like = models.PostReactions.is_liked(post_id=post_id, user_id=current_user, db=db)
 
     # remove like if the user has liked the post
     if like is not None:
         response = like.unlike_post(db)
 
     # dislike the post if the user has not liked or disliked it
-    response = models.PostReactions.dislike_post(current_user, post_id, db)
+    response = models.PostReactions.dislike_post(post_id=post_id, user_id=current_user, db=db)
     return response
 
 
@@ -260,7 +260,7 @@ def check_user_like(
         raise HTTPException(status_code=404, detail="Post not found")
 
     # check if the user has liked the post
-    like = models.PostReactions.is_liked(current_user, post_id, db)
+    like = models.PostReactions.is_liked(post_id=post_id, user_id=current_user, db=db)
 
     if like:
         return True
@@ -280,7 +280,7 @@ def check_user_dislike(
         raise HTTPException(status_code=404, detail="Post not found")
 
     # check if the user has disliked the post
-    dislike = models.PostReactions.is_disliked(current_user, post_id, db)
+    dislike = models.PostReactions.is_disliked(post_id=post_id, user_id=current_user, db=db)
 
     if dislike:
         return True
@@ -301,7 +301,7 @@ def read_post_likedby(
 
     # get all users who liked a post
     try:
-        users = models.PostReactions.get_likedby(post_id, db)
+        users = models.PostReactions.get_likedby(post_id=post_id, db=db)
         if users:
             return users
         return []
@@ -324,10 +324,28 @@ def read_post_dislikedby(
 
     # get all users who disliked a post
     try:
-        users = models.PostReactions.get_dislikedby(post_id, db)
+        users = models.PostReactions.get_dislikedby(post_id=post_id, db=db)
         if users:
             return users
         return []
 
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to get users: {str(e)}")
+    
+# count the number of likes for a post
+@router.get("/posts/likes/count/{post_id}", response_model=int)
+def count_post_likes(post_id: int, db: Session = Depends(get_db)):
+    count = models.PostReactions.get_likes_count(post_id=post_id, db=db)
+
+    if count:
+        return count
+    return 0
+
+# count the number of dislikes for a post
+@router.get("/posts/dislikes/count/{post_id}", response_model=int)
+def count_post_dislikes(post_id: int, db: Session = Depends(get_db)):
+    count = models.PostReactions.get_dislikes_count(post_id=post_id, db=db)
+
+    if count:
+        return count
+    return 0

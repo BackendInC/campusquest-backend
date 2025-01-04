@@ -15,7 +15,7 @@ def add_friend(
 ):  
     try:  
         #create a new friend instance
-        response = models.Friends.create_friend(user_id, friend.friend_id, db)
+        response = models.Friends.create_friend(user_id=user_id, friend_id=friend.friend_id, db=db)
 
         return schemas.FriendCreateResponse(
             id=response.id,
@@ -39,7 +39,7 @@ def remove_friend(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #remove a friend instance
-    return models.Friends.remove_friend(user_id, friend_id, db)
+    return models.Friends.remove_friend(user_id=user_id, friend_id=friend_id, db=db)
 
 #list all friends
 @router.get("/friends", response_model=list[schemas.FriendResponse])
@@ -48,7 +48,7 @@ def list_friends(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #list all friends
-    return models.Friends.get_friends(user_id, db)
+    return models.Friends.get_friends(user_id=user_id, db=db)
 
 #check if a user is a friend
 @router.get("/friends/{friend_id}", response_model=bool)
@@ -58,7 +58,7 @@ def check_friend(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #check if a user is a friend
-    return models.Friends.are_friends(user_id, friend_id, db)
+    return models.Friends.are_friends(user_id=user_id, friend_id=friend_id, db=db)
 
 #get mutual friends
 @router.get("/friends/mutual/{friend_id}", response_model=list[schemas.MutualFriendResponse])
@@ -68,4 +68,4 @@ def get_mutual_friends(
     user_id: int = Depends(auth.decode_jwt)
 ):
     #get mutual friends
-    return models.Friends.get_mutuals(user_id, friend_id, db)
+    return models.Friends.get_mutuals(user_id=user_id, friend_id=friend_id, db=db)
