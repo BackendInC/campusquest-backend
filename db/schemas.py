@@ -45,6 +45,7 @@ class ProfileInfoResponse(BaseModel):
     num_quests_completed: int
     num_friends: int
     post_ids: List[int]
+    selected_bee: int
 
     class Config:
         orm_mode = True
@@ -78,6 +79,7 @@ class PostBase(BaseModel):
     user_id: int
     caption: str
     created_at: datetime
+    image_url: str
 
     class Config:
         orm_mode = True
@@ -91,13 +93,25 @@ class PostCreate(BaseModel):
         orm_mode = True
 
 
-class PostResponse(BaseModel):
+class PostCreateResponse(PostBase):
     id: int  # autoincrement id
-    user_id: int
-    caption: str
-    created_at: datetime
-    image_url: str
     quest_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class PostResponse(PostBase):
+    id: int  # autoincrement id
+    likes_count: int
+    dislikes_count: int
+    quest_id: int
+    username: str
+    profile_picture_url: str
+    questname: Optional[str] = None
+
+    class Config:
+        orm_mode = True
 
 
 class PostUpdate(BaseModel):
@@ -107,7 +121,25 @@ class PostUpdate(BaseModel):
         orm_mode = True
 
 
-class PostLikeBase(BaseModel):
+class PostUpdateResponse(PostUpdate):
+    id: int  # autoincrement id
+    user_id: int
+
+    class Config:
+        orm_mode = True
+
+
+class FeedResponse(PostBase):
+    id: int  # autoincrement id
+    quest_id: int
+    username: str
+    profile_picture_url: str
+
+    class Config:
+        orm_mode = True
+
+
+class PostReactionBase(BaseModel):
     user_id: int
     post_id: int
 
@@ -115,7 +147,7 @@ class PostLikeBase(BaseModel):
         orm_mode = True
 
 
-class PostLikeCreate(BaseModel):
+class PostReactionCreate(BaseModel):
     user_id: int
     post_id: int
 
@@ -123,30 +155,12 @@ class PostLikeCreate(BaseModel):
         orm_mode = True
 
 
-class PostLikeResponse(PostLikeBase):
+class PostReactionResponse(PostReactionBase):
     id: int  # autoincrement id
     message: Optional[str] = None
 
-
-class PostCommentBase(BaseModel):
-    user_id: int
-    post_id: int
-    content: str
-    created_at: datetime
-
     class Config:
         orm_mode = True
-
-
-class PostCommentCreate(BaseModel):
-    content: str
-
-    class Config:
-        orm_mode = True
-
-
-class PostCommentResponse(PostCommentBase):
-    id: int  # autoincrement id
 
 
 class EmailVerificationInput(BaseModel):
@@ -225,22 +239,31 @@ class QuestVerification(BaseModel):
 
 
 class FriendBase(BaseModel):
-    user_id: int
     friend_id: int
+    user_id: int
 
     class Config:
         orm_mode = True
 
 
-class FriendCreate(FriendBase):
+class FriendCreateResponse(FriendBase):
+    id: int
+    message: str
+
+
+class FriendResponse(BaseModel):
     id: int  # autoincrement id
+    friend_id: int
+    username: str
+    profile_picture_url: str
 
     class Config:
         orm_mode = True
 
 
-class FriendResponse(FriendBase):
-    id: int  # autoincrement id
+class MutualFriendResponse(BaseModel):
+    friend_id: int
+    username: str
 
     class Config:
         orm_mode = True

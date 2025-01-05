@@ -14,7 +14,7 @@ import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=schemas.UserResponse)
@@ -36,7 +36,7 @@ def create_user(user: schemas.UserCreate, db: session = Depends(get_db)):
             )
         except Exception as e:
             db.rollback()
-            raise HTTPException(status_code=500, detail=e)
+            raise HTTPException(status_code=500, detail=str(e))
         db.commit()
         db.refresh(new_user)
         return new_user
@@ -59,6 +59,9 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_email_verified:
         raise HTTPException(status_code=401, detail="User is not verified")
+    if models.BannedUsers.is_banned(user.id, db):
+        raise HTTPException(status_code=403, detail="User is banned")
+
     # check if the password is correct
     hashed_password = utils.hash_password(userRequest.password, user.salt)
     if hashed_password != user.password:
@@ -82,6 +85,18 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
     }
 
 
+@router.get("/user_info")
+def get_profile(
+    db: session = Depends(get_db), current_user: int = Depends(auth.decode_jwt)
+):
+    user: models.User = (
+        db.query(models.User).filter(models.User.id == current_user).first()
+    )
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return {"id": user.id, "username": user.username, "email": user.email}
+
+
 @router.post("/users/profile_picture/upload", status_code=200)
 async def upload_profile_picture(
     profile_picture: UploadFile = File(...),
@@ -99,6 +114,10 @@ async def upload_profile_picture(
         raise HTTPException(status_code=400, detail="File size too large")
 
     image = Image.open(BytesIO(contents))
+
+    # Convert RGBA to RGB
+    if image.mode == "RGBA":
+        image = image.convert("RGB")
 
     # Convert and encode as JPEG for consistency
     buffer = BytesIO()
@@ -166,7 +185,12 @@ def get_profile_info(
 
     # count the number of likes
     num_likes = (
-        db.query(models.PostLikes).filter(models.PostLikes.user_id == user_id).count()
+        db.query(models.PostReactions)
+        .filter(
+            models.PostReactions.user_id == user_id,
+            models.PostReactions.reaction_type == "LIKE",
+        )
+        .count()
     )
 
     # count the number of achievements
@@ -196,6 +220,7 @@ def get_profile_info(
 
     return schemas.ProfileInfoResponse(
         username=user.username,
+        selected_bee=user.selected_bee,
         num_posts=num_posts,
         num_likes=num_likes,
         num_achievements=num_achievements,
@@ -203,3 +228,65 @@ def get_profile_info(
         num_friends=num_friends,
         post_ids=post_ids,
     )
+
+
+@router.post("/users_change_bee")
+def change(
+    new_bee: int,
+    db: session = Depends(get_db),
+    current_user: int = Depends(auth.decode_jwt),
+):
+    # get the user by id
+    user = db.query(models.User).filter(models.User.id == current_user).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.bee = new_bee
+    db.commit()
+    db.refresh(user)
+    return user.bee
+
+
+@router.put("/users/update/password")
+async def update_user_password(
+    password: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = utils.hash_password(password, user.salt)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/update/email")
+async def update_user_mail(
+    email: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.email = email
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/update/username")
+async def update_user_username(
+    username: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.username = username
+    db.commit()
+    db.refresh(user)
+    return user

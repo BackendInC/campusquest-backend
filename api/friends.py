@@ -1,21 +1,41 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import session
 from db import get_db, schemas, models
-import api.utils as utils
 import api.auth as auth
+from api.achievements_service import AchievementService
+from fastapi import Depends, HTTPException, APIRouter, status
 
 router = APIRouter()
 
 
 # add a new friend
-@router.post("/friends", response_model=schemas.FriendResponse)
+@router.post("/friends/{friend_id}", response_model=dict)
 def add_friend(
-    friend: schemas.FriendCreate,
+    friend_id: int,
     db: session = Depends(get_db),
     user_id: int = Depends(auth.decode_jwt),
 ):
-    # create a new friend instance
-    return models.Friends.create_friend(user_id, friend.friend_id, db)
+    try:
+        # create a new friend instance
+        response = models.Friends.create_friend(
+            user_id=user_id, friend_id=friend_id, db=db
+        )
+        new_achievements = AchievementService.check_achievements(user_id, db)
+        response = {
+            "friend_data": schemas.FriendCreateResponse(
+                id=response.id,
+                friend_id=response.friend_id,
+                user_id=response.user_id,
+                message="Friend added successfully",
+            ),
+            "new_achievements": new_achievements,
+        }
+        response["new_achievements"] = new_achievements
+
+        return response
+
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
 
 
 # remove a friend
@@ -26,7 +46,7 @@ def remove_friend(
     user_id: int = Depends(auth.decode_jwt),
 ):
     # remove a friend instance
-    return models.Friends.remove_friend(user_id, friend_id, db)
+    return models.Friends.remove_friend(user_id=user_id, friend_id=friend_id, db=db)
 
 
 # list all friends
@@ -35,26 +55,28 @@ def list_friends(
     db: session = Depends(get_db), user_id: int = Depends(auth.decode_jwt)
 ):
     # list all friends
-    return models.Friends.list_friends(user_id, db)
+    return models.Friends.get_friends(user_id=user_id, db=db)
 
 
 # check if a user is a friend
-@router.get("/friends/{friend_id}", response_model=schemas.FriendResponse)
+@router.get("/friends/{friend_id}", response_model=bool)
 def check_friend(
     friend_id: int,
     db: session = Depends(get_db),
     user_id: int = Depends(auth.decode_jwt),
 ):
     # check if a user is a friend
-    return models.Friends.check_friend(user_id, friend_id, db)
+    return models.Friends.are_friends(user_id=user_id, friend_id=friend_id, db=db)
 
 
 # get mutual friends
-@router.get("/friends/mutuals/{friend_id}", response_model=list[schemas.FriendResponse])
+@router.get(
+    "/friends/mutual/{friend_id}", response_model=list[schemas.MutualFriendResponse]
+)
 def get_mutual_friends(
     friend_id: int,
     db: session = Depends(get_db),
     user_id: int = Depends(auth.decode_jwt),
 ):
     # get mutual friends
-    return models.Friends.get_mutual_friends(user_id, friend_id, db)
+    return models.Friends.get_mutuals(user_id=user_id, friend_id=friend_id, db=db)

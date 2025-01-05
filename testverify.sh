@@ -1,6 +1,6 @@
-curl --location '3.95.204.226:8000/users/verify' \
+curl --location 'localhost:8000/users/verification' \
   --header 'Content-Type: application/json' \
   --data-raw '{
-    "username": "john-doe5",
-    "code": 257584 
+    "user_id": 34,
+    "code": 228774
 }'

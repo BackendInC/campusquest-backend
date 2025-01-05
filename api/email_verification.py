@@ -4,7 +4,7 @@ from db import schemas, get_db, models
 import api.auth as auth
 import base64
 
-router = APIRouter()  # create an instance of the APIRouter class
+router = APIRouter(tags=["users"])  # create an instance of the APIRouter class
 
 
 @router.post("/users/verify", status_code=200)

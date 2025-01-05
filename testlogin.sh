@@ -1,6 +1,6 @@
-curl --location 'localhost:8000/users/login' \
+curl --location 'localhost:8000/user/login' \
   --header 'Content-Type: application/json' \
   --data-raw '{
-    "username": "john-doe5",
+    "username": "john-doe2",
     "password": "secretpass"
 }'
