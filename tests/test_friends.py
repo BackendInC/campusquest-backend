@@ -108,8 +108,6 @@ def test_list_friends(client, db_session):
 
     # list the friends
     response = client.get("/friends", headers={"Authorization": f"Bearer {jwt}"})
-    print(f"Friends added: {len(friends)}, Friends from endpoint: {len(response.json())}")
-    print(f"Endpoint response: {response.json()}")
 
     assert response.status_code == 200
  
