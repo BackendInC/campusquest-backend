@@ -264,7 +264,7 @@ class FriendResponse(BaseModel):
 class MutualFriendResponse(BaseModel):
     friend_id: int
     username: str
-    profile_picture_url: str
+    profile_picture_url = str
 
     class Config:
         orm_mode = True

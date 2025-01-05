@@ -488,9 +488,7 @@ class PostReactions(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reaction_type = Column(
-        reaction_type_enum, nullable=False
-    )
+    reaction_type = Column(reaction_type_enum, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
