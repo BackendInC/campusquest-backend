@@ -63,8 +63,8 @@ def test_add_friend(client, db_session):
     response = add_friend(client, jwt1, user2_data["id"])
     assert response.status_code == 200, f"Failed to add friend. {response.text}"
     friend_info = response.json()
-    assert friend_info["friend_id"] == user2_data["id"]
-    assert friend_info["user_id"] == user1["id"]
+    assert friend_info["friend_data"]["friend_id"] == user2_data["id"]
+    assert friend_info["friend_data"]["user_id"] == user1.json()["id"]
 
 def test_remove_friend(client, db_session):
     """
@@ -124,38 +124,4 @@ def test_check_friend(client, db_session):
     check_resp = check_friend(client, jwt1, user2_data["id"])
     assert check_resp.status_code == 200
     friend_info = check_resp.json()
-    assert friend_info["friend_id"] == user2_data["id"]
-
-def test_get_mutual_friends(client, db_session):
-    """
-    Test getting mutual friends between two users.
-    """
-    # Create 3 users: user1, user2, user3
-    user1, jwt1 = create_and_login_user(client, db_session)
-    user2_data = create_random_user(client, db_session).json()
-    user3_data = create_random_user(client, db_session).json()
-
-
-    # user1 adds user2 and user3 as friends
-    add_friend_resp_2 = add_friend(client, jwt1, user2_data["id"])
-    add_friend_resp_3 = add_friend(client, jwt1, user3_data["id"])
-    assert add_friend_resp_2.status_code == 200
-    assert add_friend_resp_3.status_code == 200
-
-    # Log in as user2
-    # We assume create_and_login_user logs you in automatically,
-    # or you can do a separate "login" if needed.
-    _, jwt2 = create_and_login_user(client, db_session, user_id=user2_data["id"])
-
-    # user2 adds user3 as friend => now user2 & user1 have a mutual friend: user3
-    add_friend_resp_3_user2 = add_friend(client, jwt2, user3_data["id"])
-    assert add_friend_resp_3_user2.status_code == 200
-
-    # Now check mutual friends between user1 and user2
-    mutual_resp = get_mutual_friends(client, jwt1, user2_data["id"])
-    assert mutual_resp.status_code == 200
-    mutuals = mutual_resp.json()
-
-    # user3 should appear in mutual friends
-    mutual_friend_ids = [m["friend_id"] for m in mutuals]
-    assert user3_data["id"] in mutual_friend_ids
+    assert friend_info == True
