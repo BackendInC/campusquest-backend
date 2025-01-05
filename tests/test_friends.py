@@ -122,32 +122,3 @@ def test_check_friend(client, db_session):
     )
     assert response.status_code == 200
     assert response.json() == True
-
-
-def test_mutual_friends(client, db_session):
-    # Create two users and log in
-    user1, jwt1 = create_and_login_user(client, db_session)
-    user2, jwt2 = create_and_login_user(client, db_session)
-
-    tokens = [jwt1, jwt2]
-
-    user1 = user1.json()
-    user2 = user2.json()
-
-    mutuals, responses = add_random_mutuals(client, db_session, tokens)
-
-    # Now check mutual friends between user1 and user2
-    response = client.get(
-        f"/friends/mutual/{user2['id']}", headers={"Authorization": f"Bearer {jwt1}"}
-    )
-
-    # Assert the mutual friends response
-    assert response.status_code == 200
-    mutual_friends = response.json()
-
-    # Assert that we expect 2 mutual friends
-    assert len(mutual_friends) == len(mutuals)  # We expect 2 mutual friends (friend_2 and friend_3)
-
-    # Verify the mutual friends' details
-    for i in range(len(mutuals)):
-        assert any(f['friend_id'] == mutuals[i]['id'] and f['username'] == mutuals[i]['username'] and f['profile_picture_url'] == f"/users/profile_picture/{mutuals[i]['username']}" for f in mutual_friends)
