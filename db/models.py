@@ -489,7 +489,7 @@ class PostReactions(Base):
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     reaction_type = Column(
-        ENUM(ReactionType, name="reactiontype", create_type=False), nullable=False
+        reaction_type_enum, nullable=False
     )
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
@@ -1022,12 +1022,12 @@ class Friends(Base):
 
             # Append the processed friend data
             friends_details.append(
-                {
-                    "id": friendship.id,
-                    "friend_id": friend_id,
-                    "username": username,
-                    "profile_picture_url": f"/users/profile_picture/{username}",
-                }
+                schemas.FriendResponse(
+                    friendship.id,
+                    friend_id,
+                    username,
+                    f"/users/profile_picture/{username}"
+                )
             )
 
         return friends_details
