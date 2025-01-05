@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
 from PIL import Image
-from sqlalchemy import func, case
+from sqlalchemy import func, case, text
 from sqlalchemy.dialects.postgresql import ENUM
 import enum
 
@@ -179,7 +179,23 @@ class Achievements(Base):
                 award_tokens=achievement["award_tokens"],
             )
             db.add(new_achievement)
-            db.commit()
+
+        # Commit the achievements
+        db.commit()
+
+        # Update the sequence to the maximum ID value
+        # This ensures future auto-incremented IDs start after your manually set IDs
+        db.execute(
+            text(
+                """
+            SELECT setval(
+                pg_get_serial_sequence('achievements', 'id'),
+                COALESCE((SELECT MAX(id) FROM achievements), 0)
+            );
+        """
+            )
+        )
+        db.commit()
 
 
 class UserAchievements(Base):
@@ -488,9 +504,7 @@ class PostReactions(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     post_id = Column(Integer, ForeignKey("posts.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
-    reaction_type = Column(
-        reaction_type_enum, nullable=False
-    )
+    reaction_type = Column(reaction_type_enum, nullable=False)
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
     __table_args__ = (UniqueConstraint("post_id", "user_id", name="_post_user_uc"),)
