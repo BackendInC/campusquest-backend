@@ -94,7 +94,12 @@ def get_profile(
     )
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"id": user.id, "username": user.username, "email": user.email}
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "selected_bee": user.selected_bee,
+    }
 
 
 @router.post("/users/profile_picture/upload", status_code=200)
@@ -240,10 +245,10 @@ def change(
     user = db.query(models.User).filter(models.User.id == current_user).first()
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
-    user.bee = new_bee
+    user.selected_bee = new_bee
     db.commit()
     db.refresh(user)
-    return user.bee
+    return {"message:": "Bee updated successfully", "new_bee": user.selected_bee}
 
 
 @router.put("/users/update/password")
