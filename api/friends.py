@@ -20,6 +20,7 @@ def add_friend(
         response = models.Friends.create_friend(
             user_id=user_id, friend_id=friend_id, db=db
         )
+        new_achievements = AchievementService.check_achievements(user_id, db)
         response = {
             "friend_data": schemas.FriendCreateResponse(
                 id=response.id,
@@ -27,7 +28,9 @@ def add_friend(
                 user_id=response.user_id,
                 message="Friend added successfully",
             ),
+            "new_achievements": new_achievements,
         }
+        response["new_achievements"] = new_achievements
 
         return response
 
