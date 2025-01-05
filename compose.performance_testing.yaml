@@ -1,0 +1,47 @@
+services:
+  db:
+    image: postgres
+    restart: always
+    environment:
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: 1234
+      POSTGRES_DB: backendinc
+    ports:
+      - 5432:5432
+    networks:
+      backend-network:
+        ipv4_address: 10.5.0.2
+
+  adminer:
+    image: adminer
+    restart: always
+    ports:
+      - "8080:8080"
+    networks:
+      backend-network:
+        ipv4_address: 10.5.0.3
+
+  fastapi_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://root:1234@10.5.0.2:5432/backendinc?sslmode=disable
+      TEST: "1"
+    depends_on:
+      - db
+    volumes:
+      - ./:/app
+    networks:
+      backend-network:
+        ipv4_address: 10.5.0.4
+
+networks:
+  backend-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.0.0/16
+          gateway: 10.5.0.1

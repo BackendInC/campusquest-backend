@@ -5,7 +5,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from io import BytesIO
 from PIL import Image
-from sqlalchemy import func, case
+from sqlalchemy import func, case, text
 from sqlalchemy.dialects.postgresql import ENUM
 import enum
 
@@ -179,7 +179,23 @@ class Achievements(Base):
                 award_tokens=achievement["award_tokens"],
             )
             db.add(new_achievement)
-            db.commit()
+
+        # Commit the achievements
+        db.commit()
+
+        # Update the sequence to the maximum ID value
+        # This ensures future auto-incremented IDs start after your manually set IDs
+        db.execute(
+            text(
+                """
+            SELECT setval(
+                pg_get_serial_sequence('achievements', 'id'),
+                COALESCE((SELECT MAX(id) FROM achievements), 0)
+            );
+        """
+            )
+        )
+        db.commit()
 
 
 class UserAchievements(Base):
@@ -1029,51 +1045,3 @@ class Friends(Base):
             )
 
         return friends_details
-
-    @staticmethod
-    def get_mutuals(user_id, friend_id, db):
-        # Check if both users exist
-        users_exist = (
-            db.query(User.id).filter(User.id.in_([user_id, friend_id])).count()
-        )
-        if users_exist < 2:
-            raise HTTPException(status_code=404, detail="One or both users not found")
-
-        # Get friend IDs for the first user
-        user_friend_ids = (
-            db.query(Friends.user_id, Friends.friend_id)
-            .filter((Friends.user_id == user_id) | (Friends.friend_id == user_id))
-            .all()
-        )
-        # Correct the set comprehension
-        user_friend_ids = {f1 if f1 != user_id else f2 for f1, f2 in user_friend_ids}
-
-        # Get friend IDs for the second user
-        friend_friend_ids = (
-            db.query(Friends.user_id, Friends.friend_id)
-            .filter((Friends.user_id == friend_id) | (Friends.friend_id == friend_id))
-            .all()
-        )
-        # Correct the set comprehension
-        friend_friend_ids = {
-            f1 if f1 != friend_id else f2 for f1, f2 in friend_friend_ids
-        }
-
-        # Get mutual friend IDs
-        mutual_friend_ids = user_friend_ids.intersection(friend_friend_ids)
-
-        # Fetch mutual friend details
-        mutual_friends = db.query(User).filter(User.id.in_(mutual_friend_ids)).all()
-
-        if not mutual_friends:
-            return []
-
-        # Return mutual friends as a list of dictionaries
-        return [
-            schemas.MutualFriendResponse(
-                friend_id=mf.id,
-                username=mf.username,
-                profile_picture_url=f"/users/profile_picture/{mf.username}",
-            )
-            for mf in mutual_friends
-        ]

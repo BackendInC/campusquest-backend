@@ -24,7 +24,6 @@ def create_random_post(client, db_session, jwt):
     )
 
     assert response.status_code == 200
-
     return response
 
 
@@ -32,4 +31,17 @@ def test_read_posts(client, db_session):
     user, jwt = create_and_login_user(client, db_session)
     post = create_random_post(client, db_session, jwt)
     response = client.get("/feed")
+    assert response.status_code == 200
+
+
+def test_read_friends_posts(client, db_session):
+    friend, friend_jwt = create_and_login_user(client, db_session)
+    post = create_random_post(client, db_session, friend_jwt)
+    user, jwt = create_and_login_user(client, db_session)
+    make_friend = client.post(
+        "/friends",
+        json={"friend_id": friend.json()["id"]},
+        headers={"Authorization": f"Bearer {jwt}"},
+    )
+    response = client.get("/feed/friends", headers={"Authorization": f"Bearer {jwt}"})
     assert response.status_code == 200
