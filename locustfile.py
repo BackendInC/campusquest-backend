@@ -248,45 +248,46 @@ class PostBehavior(HttpUser):
                 "caption": f"Test post created at {datetime.now(timezone.utc)}",
                 "quest_id": random.randint(1, 5)  # Assuming quest IDs 1-5 exist
             }
-            try:
-                response = self.client.post("/posts",
-                                            headers=self.headers,
-                                            data=data,
-                                            files=files)
+
+            with self.client.post("/posts",
+                                  headers=self.headers,
+                                  data=data,
+                                  files=files,
+                                  catch_response=True) as response:
                 if response.status_code == 200:
                     post_data = response.json()
                     if post_data and "id" in post_data:
                         self.post_ids.append(post_data["id"])
-            except Exception as e:
-                print(f"Failed to create post: {str(e)}")
+                        response.success()
+                else:
+                    response.failure(f"Failed to create post: {response.status_code}")
 
     @task(3)
     def read_posts(self):
         """Read all posts"""
         if hasattr(self, 'headers'):
-            try:
-                # Use the image URL endpoint instead of base64 encoded images
-                response = self.client.get("/posts", headers=self.headers,
-                                           catch_response=True)
+            with self.client.get("/posts",
+                                 headers=self.headers,
+                                 catch_response=True) as response:
                 if response.status_code == 200:
                     posts = response.json()
-                    # Update post_ids list with valid post IDs
                     self.post_ids = [post["id"] for post in posts if "id" in post]
                     response.success()
                 else:
                     response.failure(f"Failed to read posts: {response.status_code}")
-            except Exception as e:
-                print(f"Error reading posts: {str(e)}")
 
     @task(1)
     def read_specific_post(self):
         """Read a specific post"""
         if hasattr(self, 'headers') and self.post_ids:
             post_id = random.choice(self.post_ids)
-            try:
-                self.client.get(f"/posts/{post_id}", headers=self.headers)
-            except Exception as e:
-                print(f"Error reading post {post_id}: {str(e)}")
+            with self.client.get(f"/posts/{post_id}",
+                                 headers=self.headers,
+                                 catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to read post {post_id}: {response.status_code}")
 
     @task(1)
     def update_post(self):
@@ -296,22 +297,27 @@ class PostBehavior(HttpUser):
             data = {
                 "caption": f"Updated caption at {datetime.now(timezone.utc)}"
             }
-            try:
-                self.client.put(f"/posts/{post_id}",
-                                headers=self.headers,
-                                json=data)
-            except Exception as e:
-                print(f"Error updating post {post_id}: {str(e)}")
+            with self.client.put(f"/posts/{post_id}",
+                                 headers=self.headers,
+                                 json=data,
+                                 catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to update post {post_id}: {response.status_code}")
 
     @task(1)
     def like_unlike_post(self):
         """Toggle like on a post"""
         if hasattr(self, 'headers') and self.post_ids:
             post_id = random.choice(self.post_ids)
-            try:
-                self.client.post(f"/posts/{post_id}/like", headers=self.headers)
-            except Exception as e:
-                print(f"Error toggling like on post {post_id}: {str(e)}")
+            with self.client.post(f"/posts/{post_id}/like",
+                                  headers=self.headers,
+                                  catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to toggle like on post {post_id}: {response.status_code}")
 
     @task(2)
     def add_comment(self):
@@ -321,32 +327,40 @@ class PostBehavior(HttpUser):
             data = {
                 "content": f"Test comment at {datetime.now(timezone.utc)}"
             }
-            try:
-                self.client.post(f"/posts/{post_id}/comment",
-                                 headers=self.headers,
-                                 json=data)
-            except Exception as e:
-                print(f"Error adding comment to post {post_id}: {str(e)}")
+            with self.client.post(f"/posts/{post_id}/comment",
+                                  headers=self.headers,
+                                  json=data,
+                                  catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to add comment to post {post_id}: {response.status_code}")
 
     @task(3)
     def read_comments(self):
         """Read comments on a post"""
         if hasattr(self, 'headers') and self.post_ids:
             post_id = random.choice(self.post_ids)
-            try:
-                self.client.get(f"/posts/{post_id}/comments", headers=self.headers)
-            except Exception as e:
-                print(f"Error reading comments for post {post_id}: {str(e)}")
+            with self.client.get(f"/posts/{post_id}/comments",
+                                 headers=self.headers,
+                                 catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to read comments for post {post_id}: {response.status_code}")
 
     @task(1)
     def get_post_image(self):
         """Retrieve a post's image"""
         if hasattr(self, 'headers') and self.post_ids:
             post_id = random.choice(self.post_ids)
-            try:
-                self.client.get(f"/posts/image/{post_id}", headers=self.headers)
-            except Exception as e:
-                print(f"Error getting image for post {post_id}: {str(e)}")
+            with self.client.get(f"/posts/image/{post_id}",
+                                 headers=self.headers,
+                                 catch_response=True) as response:
+                if response.status_code == 200:
+                    response.success()
+                else:
+                    response.failure(f"Failed to get image for post {post_id}: {response.status_code}")
 
     tasks = {
         read_posts: 3,
@@ -358,114 +372,90 @@ class PostBehavior(HttpUser):
         read_comments: 3,
         get_post_image: 1
     }
+#
+class FriendBehavior(HttpUser):
+    wait_time = between(1, 5)
 
-#
-# class FriendBehavior(HttpUser):
-#     wait_time = between(1, 5)
-#
-#     def on_start(self):
-#         """Ensure user is logged in before proceeding with friend-related tasks."""
-#         self.login_existing_user()
-#
-#     def login_existing_user(self):
-#         """Attempt to login with a user from the shared pool."""
-#         user = UserPool.get_random_user()
-#         if user and user["token"]:
-#             self.username = user["username"]
-#             self.token = user["token"]
-#
-#             # Get user ID from profile endpoint
-#             headers = {'Authorization': f'Bearer {self.token}'}
-#             profile_response = self.client.get("/users/profile", headers=headers)
-#
-#             if profile_response.ok:
-#                 self.user_id = profile_response.json().get("id")
-#                 self.headers = headers
-#                 self.logged_in = True
-#
-#                 # Update user pool with user_id
-#                 UserPool.add_user(self.username, user["password"], self.token, self.user_id)
-#             else:
-#                 print("Failed to get user profile")
-#                 self.create_and_login_user()
-#         else:
-#             print("No valid user in pool, attempting to login anew.")
-#             self.create_and_login_user()
-#
-#     def create_and_login_user(self):
-#         """Create a new user and login to generate a token."""
-#         username = f"user_{random.randint(1000, 9999)}"
-#         password = "password123"  # Made password more secure
-#         payload = {
-#             "username": username,
-#             "password": password,
-#             "email": f"{username}@example.com",
-#             "date_of_birth": "1990-01-01"
-#         }
-#
-#         # Create user
-#         create_resp = self.client.post("/users", json=payload)
-#         if create_resp.ok:
-#             # Login user
-#             login_resp = self.client.post("/users/login", json={"username": username, "password": password})
-#             if login_resp.ok:
-#                 self.token = login_resp.json().get("jwt_token")
-#                 self.headers = {'Authorization': f'Bearer {self.token}'}
-#
-#                 # Get user ID from profile
-#                 profile_resp = self.client.get("/users/profile", headers=self.headers)
-#                 if profile_resp.ok:
-#                     self.user_id = profile_resp.json().get("id")
-#                     UserPool.add_user(username, password, self.token, self.user_id)
-#                     self.logged_in = True
-#                     self.username = username
-#                 else:
-#                     print("Failed to get user profile for new user")
-#             else:
-#                 print(f"Failed to login newly created user {username}")
-#         else:
-#             print(f"Failed to create user {username}")
-#
-#     @task(3)
-#     def add_friend(self):
-#         """Attempt to add a friend if logged in."""
-#         if hasattr(self, 'logged_in') and hasattr(self, 'user_id'):
-#             potential_friend = UserPool.get_random_user()
-#             if (potential_friend and
-#                     potential_friend.get("user_id") and
-#                     potential_friend["user_id"] != self.user_id):
-#                 try:
-#                     self.client.post(
-#                         "/friends",
-#                         json={"friend_id": potential_friend["user_id"]},
-#                         headers=self.headers
-#                     )
-#                 except Exception as e:
-#                     print(f"Error adding friend: {str(e)}")
-#
-#     @task(5)
-#     def list_friends(self):
-#         """List all friends of the current user."""
-#         if hasattr(self, 'logged_in'):
-#             try:
-#                 response = self.client.get("/friends", headers=self.headers)
-#                 if response.ok:
-#                     self.friends = response.json()
-#             except Exception as e:
-#                 print(f"Error listing friends: {str(e)}")
-#
-#     @task(1)
-#     def remove_friend(self):
-#         """Remove a friend from the current user's friend list."""
-#         if hasattr(self, 'logged_in') and hasattr(self, 'friends'):
-#             try:
-#                 # Get random friend from actual friend list
-#                 if self.friends:
-#                     friend = random.choice(self.friends)
-#                     friend_id = friend.get("id")
-#                     if friend_id:
-#                         self.client.delete(f"/friends/{friend_id}", headers=self.headers)
-#             except Exception as e:
-#                 print(f"Error removing friend: {str(e)}")
-#
-#     tasks = {add_friend: 3, list_friends: 5, remove_friend: 1}
+    def on_start(self):
+        """ Initialize user session by logging in or creating a new user """
+        self.login_existing_user()
+        self.friends = []  # Initialize friends list
+
+    def login_existing_user(self):
+        """ Use an existing user from the user pool or create a new user if none available """
+        user = UserPool.get_random_user()
+        if user and user["token"]:
+            self.username = user["username"]
+            self.token = user["token"]
+            headers = {'Authorization': f'Bearer {self.token}'}
+            profile_response = self.client.get("/users/profile", headers=headers)
+            if profile_response.status_code == 200:
+                self.user_id = profile_response.json().get("id")
+                self.headers = headers
+                self.logged_in = True
+                UserPool.add_user(self.username, user["password"], self.token, self.user_id)
+            else:
+                print(f"Failed to get user profile, Status Code: {profile_response.status_code}")
+                self.create_and_login_user()
+        else:
+            self.create_and_login_user()
+
+    def create_and_login_user(self):
+        """ Create a new user and log them in """
+        username = f"user_{random.randint(1000, 9999)}"
+        password = "password123"
+        payload = {
+            "username": username,
+            "password": password,
+            "email": f"{username}@example.com",
+            "date_of_birth": "1990-01-01"
+        }
+        create_resp = self.client.post("/users", json=payload)
+        if create_resp.status_code == 200:
+            login_resp = self.client.post("/users/login", json={"username": username, "password": password})
+            if login_resp.status_code == 200:
+                self.token = login_resp.json().get("jwt_token")
+                self.headers = {'Authorization': f'Bearer {self.token}'}
+                profile_resp = self.client.get("/users/profile", headers=self.headers)
+                if profile_resp.status_code == 200:
+                    self.user_id = profile_resp.json().get("id")
+                    UserPool.add_user(username, password, self.token, self.user_id)
+                    self.logged_in = True
+                    self.username = username
+                else:
+                    print("Failed to get user profile for new user")
+            else:
+                print(f"Failed to login newly created user {username}, Status Code: {login_resp.status_code}")
+        else:
+            print(f"Failed to create user {username}, Status Code: {create_resp.status_code}")
+
+    @task(3)
+    def add_friend(self):
+        """ Send a friend request to a random user """
+        if hasattr(self, 'logged_in') and hasattr(self, 'user_id'):
+            potential_friend = UserPool.get_random_user()
+            if potential_friend and potential_friend.get("user_id") and potential_friend["user_id"] != self.user_id:
+                response = self.client.post("/friends", json={"friend_id": potential_friend["user_id"]}, headers=self.headers)
+                if response.status_code != 200:
+                    print(f"Failed to add friend, Status Code: {response.status_code}, Response: {response.text}")
+
+    @task(5)
+    def list_friends(self):
+        """ List all friends of the current user """
+        if hasattr(self, 'logged_in'):
+            response = self.client.get("/friends", headers=self.headers)
+            if response.status_code == 200:
+                self.friends = response.json()
+            else:
+                print(f"Failed to list friends, Status Code: {response.status_code}, Response: {response.text}")
+
+    @task(1)
+    def remove_friend(self):
+        """ Remove a friend from the current user's friend list """
+        if hasattr(self, 'logged_in') and self.friends:
+            friend = random.choice(self.friends)
+            friend_id = friend.get("id")
+            if friend_id:
+                response = self.client.delete(f"/friends/{friend_id}", headers=self.headers)
+                if response.status_code != 200:
+                    print(f"Failed to remove friend, Status Code: {response.status_code}, Response: {response.text}")
