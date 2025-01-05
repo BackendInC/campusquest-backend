@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 from test_users import create_and_login_user, create_random_user
 import random
 
