@@ -14,7 +14,7 @@ import os
 
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 
-router = APIRouter()
+router = APIRouter(tags=["users"])
 
 
 @router.post("/users", response_model=schemas.UserResponse)
@@ -59,6 +59,9 @@ def login_user(userRequest: schemas.UserLogin, db: session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="User not found")
     if not user.is_email_verified:
         raise HTTPException(status_code=401, detail="User is not verified")
+    if models.BannedUsers.is_banned(user.id, db):
+        raise HTTPException(status_code=403, detail="User is banned")
+
     # check if the password is correct
     hashed_password = utils.hash_password(userRequest.password, user.salt)
     if hashed_password != user.password:
@@ -241,3 +244,49 @@ def change(
     db.commit()
     db.refresh(user)
     return user.bee
+
+
+@router.put("/users/update/password")
+async def update_user_password(
+    password: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.password = utils.hash_password(password, user.salt)
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/update/email")
+async def update_user_mail(
+    email: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.email = email
+    db.commit()
+    db.refresh(user)
+    return user
+
+
+@router.put("/users/update/username")
+async def update_user_username(
+    username: str,
+    db: session = Depends(get_db),
+    user_id: int = Depends(auth.decode_jwt),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    user.username = username
+    db.commit()
+    db.refresh(user)
+    return user
