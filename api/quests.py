@@ -122,7 +122,7 @@ def read_user_quests(user_id: int, db: Session = Depends(get_db)):
                         "is_done": user_quest.is_done,
                         "date_completed": user_quest.date_completed,
                         "is_verified": user_quest.is_verified,
-                        "post_id": user_quest.post_id,
+                        "post_id": user_quest.post[0].id,
                     },
                 }
             )
@@ -170,10 +170,10 @@ def read_logged_in_user_quests(
                     description=quest.description,
                     is_complete=user_quest.is_done,
                     is_verified=user_quest.is_verified,
-                    post_id=user_quest.post_id,
+                    post_id=user_quest.post[0].id,
                     image_url=(
-                        f"/posts/image/{user_quest.post_id}"
-                        if user_quest.post_id
+                        f"/posts/image/{user_quest.post[0].id}"
+                        if user_quest.post
                         else None
                     ),
                 )

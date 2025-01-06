@@ -99,6 +99,10 @@ def get_profile(
         "username": user.username,
         "email": user.email,
         "selected_bee": user.selected_bee,
+        "is_admin": db.query(models.Admin)
+        .filter(models.Admin.user_id == user.id)
+        .first()
+        is not None,
     }
 
 
